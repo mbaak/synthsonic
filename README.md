@@ -1,1 +1,1 @@
-# synsonic
+# synthsonic
