@@ -1,8 +1,8 @@
-from setuptools import find_packages, setup
+from setuptools import setup
 
 setup(
-    name='src',
-    packages=find_packages(),
+    name='synthsonic',
+    packages=['synthsonic'],
     version='0.1.0',
     description='Super realistic data modelling and synthesis',
     author='ING WBAA',

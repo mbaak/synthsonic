@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from kde_copula_nn_pdf import KDECopulaNNPdf
+from synthsonic.models.kde_copula_nn_pdf import KDECopulaNNPdf
 from scipy.stats import multivariate_normal
 
 
