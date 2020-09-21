@@ -1,5 +1,5 @@
 import numpy as np
-from kde_utils import kde_process_data, kde_bw, kde_make_transformers, kde_smooth_peaks_1dim
+from src.models.kde_utils import kde_process_data, kde_bw, kde_make_transformers, kde_smooth_peaks_1dim
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted, FLOAT_DTYPES, _deprecate_positional_args
