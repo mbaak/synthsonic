@@ -1,8 +1,8 @@
 import numpy as np
-from src.models.kde_quantile_tranformer import KDEQuantileTransformer
+from synthsonic.models.kde_quantile_tranformer import KDEQuantileTransformer
 from sklearn.base import BaseEstimator
 from sklearn.utils import check_array
-from sklearn.utils.validation import check_is_fitted, FLOAT_DTYPES, _deprecate_positional_args
+from sklearn.utils.validation import check_is_fitted, FLOAT_DTYPES#, _deprecate_positional_args
 from sklearn.decomposition import PCA
 from sklearn.feature_selection import mutual_info_regression
 from sklearn.pipeline import make_pipeline
@@ -24,7 +24,7 @@ class KDECopulaNNPdf(BaseEstimator):
     6. NN classifier to model the copula space of the selected top-n variables.
     7. Recalibration of classifier probabilities.
     """
-    @_deprecate_positional_args
+    #   @_deprecate_positional_args
     def __init__(self,
                  n_quantiles=500,
                  mirror_left=None,
