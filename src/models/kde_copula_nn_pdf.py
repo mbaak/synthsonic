@@ -170,7 +170,7 @@ class KDECopulaNNPdf(BaseEstimator):
         # determine number of features to use for nonlinear modelling
         self._configure_nonlinear_variables(X_uniform)
 
-        if self.n_vars_ >= 2 and not self.force_uncorrelated:
+        if self.n_vars_ >= 2 and not self.force_uncorrelated and self.clf is not None:
             # note: residual vars are treated as uncorrelated
             X_slice = X_uniform[:, self.nonlinear_indices_]
             # this function captures in matrices the residual non-linearity after the transformations above.
@@ -217,7 +217,7 @@ class KDECopulaNNPdf(BaseEstimator):
 
         # trivial case
         n_samples = X.shape[0]
-        if self.n_vars_ <= 1 or self.force_uncorrelated:
+        if self.n_vars_ <= 1 or self.force_uncorrelated or self.clf is None:
             return np.ones(n_samples)
 
         prob = self.calibrated_.predict_proba(X)
