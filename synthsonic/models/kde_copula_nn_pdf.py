@@ -2,7 +2,7 @@ import numpy as np
 from synthsonic.models.kde_quantile_tranformer import KDEQuantileTransformer
 from sklearn.base import BaseEstimator
 from sklearn.utils import check_array
-from sklearn.utils.validation import check_is_fitted, FLOAT_DTYPES#, _deprecate_positional_args
+# from sklearn.utils.validation import check_is_fitted, FLOAT_DTYPES#, _deprecate_positional_args
 from sklearn.decomposition import PCA
 from sklearn.feature_selection import mutual_info_regression
 from sklearn.pipeline import make_pipeline
@@ -217,7 +217,7 @@ class KDECopulaNNPdf(BaseEstimator):
             corresponds to a single data point.
         :return: array of Copula densities for all data points.
         """
-        check_is_fitted(self)
+#         check_is_fitted(self)
 
         # trivial case
         n_samples = X.shape[0]
@@ -368,7 +368,7 @@ class KDECopulaNNPdf(BaseEstimator):
             probability densities, so values will be low for high-dimensional
             data.
         """
-        check_is_fitted(self)
+#         check_is_fitted(self)
         X = check_array(X, copy=self.copy, dtype=FLOAT_DTYPES, force_all_finite="allow-nan")
 
         n_features = X.shape[1]
@@ -469,7 +469,7 @@ class KDECopulaNNPdf(BaseEstimator):
             List of samples, sample weights
         """
         # trivial checks
-        check_is_fitted(self)
+#         check_is_fitted(self)
         if not (self.n_vars_ > 0 or self.n_resid_vars_ > 0):
             raise RuntimeError('pdf not configured for sample generation.')
 
