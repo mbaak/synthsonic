@@ -6,13 +6,13 @@ from sklearn.utils.validation import FLOAT_DTYPES # check_is_fitted, _deprecate_
 from sklearn.preprocessing import QuantileTransformer
 from scipy.stats import norm
 from scipy.special import erf
+from scipy import interpolate
 import warnings
 
 
 class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
     """ Quantile tranformer class using for each variable the CDF obtained with kernel density estimation
     """
-#     @_deprecate_positional_args
     def __init__(self,
                  n_quantiles=1000,
                  output_distribution='uniform',
@@ -185,8 +185,10 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
             X = np.concatenate([X, low, high], axis=0)
         elif self.smooth_peaks:
             X = self._smooth_peaks(X)
+            # create pdf for quantile transformation
+            self._qt_pdf(X)
 
-        # quantile tranformation from kde may not always be perfect.
+        # perform quantile transformation to smooth out any residual imperfections after kde
         # standard quantile transformer helps to smooth out any residual imperfections after kde transformation,
         # and does conversion to normal.
         self.qt_ = QuantileTransformer(n_quantiles=self.n_quantiles, output_distribution=self.output_distribution,
@@ -194,6 +196,30 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         self.qt_.fit(X)
 
         return self
+
+    def _qt_pdf(self, X, min_pdf_value=1e-20):
+        """Internal function to make quantile transformer pdf
+
+        Is only run when use_KDE=False
+
+        :param X: ndarray or sparse matrix, shape (n_samples, n_features)
+            The data used to scale along the features axis.
+        """
+        self.pdf_ = []
+
+        n_samples, n_features = X.shape
+        ps = np.linspace(0, 1, self.n_quantiles + 1)
+
+        # calculate quantiles and pdf
+        for i in range(n_features):
+            x = X[:, i]
+            qs = np.quantile(x, ps)
+            bin_entries, bin_edges = np.histogram(x, bins=qs)
+            bin_diffs = np.diff(bin_edges)
+            pdf_norm = bin_entries / n_samples / bin_diffs
+            fast_pdf = interpolate.interp1d(bin_edges[:-1], pdf_norm, kind='previous', bounds_error=False,
+                                            fill_value=(min_pdf_value, min_pdf_value))
+            self.pdf_.append({'fast': fast_pdf})
 
     def _kde_fit(self, X):
         """Internal function to compute the kde-based quantiles used for transforming.
@@ -254,8 +280,6 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         :return: ndarray or sparse matrix, shape (n_samples, n_features)
             The transformed data
         """
-#         check_is_fitted(self)
-
         X = check_array(X, copy=self.copy, dtype=FLOAT_DTYPES, force_all_finite="allow-nan")
 
         n_features = X.shape[1]
@@ -299,8 +323,6 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         :return: ndarray or sparse matrix, shape (n_samples, n_features)
             The inverse-transformed data
         """
-#         check_is_fitted(self)
-
         n_features = X.shape[1]
         for feature_idx in range(n_features):
             x = X[:, feature_idx]
@@ -334,8 +356,6 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         :return: ndarray or sparse matrix, shape (n_samples, )
             An array with the jacobian of each data point
         """
-#         check_is_fitted(self)
-
         X = check_array(X, copy=self.copy, dtype=FLOAT_DTYPES, force_all_finite="allow-nan")
 
         jac = 1.0
@@ -359,8 +379,6 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         :return: ndarray or sparse matrix, shape (n_samples, )
             An array with the jacobian of the inverse transformation of each input data point
         """
-#         check_is_fitted(self)
-
         X = check_array(X, copy=self.copy, dtype=FLOAT_DTYPES, force_all_finite="allow-nan")
 
         inv_jac = 1.0
