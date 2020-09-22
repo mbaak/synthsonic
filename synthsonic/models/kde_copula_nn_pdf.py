@@ -41,6 +41,7 @@ class KDECopulaNNPdf(BaseEstimator):
                  force_uncorrelated=False,
                  clf=MLPClassifier(random_state=0, max_iter=300),
                  random_state=0,
+                 use_inverse_qt=False,
                  copy=True):
         """Parameters of the KDECopulaNNPdf class
 
@@ -95,6 +96,7 @@ class KDECopulaNNPdf(BaseEstimator):
         self.clf = clf
         self.copy = copy
         self.random_state = random_state
+        self.use_inverse_qt = use_inverse_qt
         self.min_pdf_value = 1e-20
         self.max_scale_value = 500
 
@@ -150,10 +152,11 @@ class KDECopulaNNPdf(BaseEstimator):
                                                               mirror_right=self.mirror_right, rho=self.rho,
                                                               n_adaptive=self.n_adaptive, x_min=self.x_min,
                                                               x_max=self.x_max, copy=self.copy,
-                                                              random_state=self.random_state),
+                                                              random_state=self.random_state,
+                                                              use_inverse_qt=self.use_inverse_qt),
                                        PCA(n_components=n_features, whiten=False, copy=self.copy),
                                        KDEQuantileTransformer(n_quantiles=self.n_quantiles,
-                                                              output_distribution='uniform', rho=0.2,
+                                                              output_distribution='uniform', rho=min(self.rho, 0.2),
                                                               n_adaptive=self.n_adaptive, use_inverse_qt=True,
                                                               copy=self.copy, random_state=self.random_state)
                                        )
@@ -164,7 +167,8 @@ class KDECopulaNNPdf(BaseEstimator):
                                                               mirror_right=self.mirror_right, rho=self.rho,
                                                               n_adaptive=self.n_adaptive, x_min=self.x_min,
                                                               x_max=self.x_max, copy=self.copy,
-                                                              random_state=self.random_state))
+                                                              random_state=self.random_state,
+                                                              use_inverse_qt=self.use_inverse_qt))
         print(f'Transforming variables.')
         X_uniform = self.pipe_.fit_transform(X)
         # determine number of features to use for nonlinear modelling

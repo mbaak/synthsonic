@@ -440,13 +440,13 @@ def kde_make_transformers(bin_mean, bin_entries, band_width=None, x_min=None, x_
     step_x_left = x_center[1] - x_center[0]
     step_x_right = x_center[-1] - x_center[-2]
 
-    x_transition_left = np.arange(x_linear_left[-1], x_center[0], step_x_left)
-    x_transition_right = np.arange(x_center[-1], x_linear_right[0], step_x_right)
+    x_transition_left = np.arange(x_linear_left[-1], x_center[0], step_x_left) if step_x_left > 0 else []
+    x_transition_right = np.arange(x_center[-1], x_linear_right[0], step_x_right) if step_x_right > 0 else []
 
     if len(x_transition_left) > 100:
         x_transition_left = x_transition_left[-100:]
     if len(x_transition_right) > 100:
-        x_transition_right = x_transition_left[:100]
+        x_transition_right = x_transition_right[:100]
 
     # merge all pieces together
     x_grid = np.concatenate([x_linear_left, x_transition_left, x_center, x_transition_right, x_linear_right], axis=None)
