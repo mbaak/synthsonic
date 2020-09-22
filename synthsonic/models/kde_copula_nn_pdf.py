@@ -2,7 +2,7 @@ import numpy as np
 from synthsonic.models.kde_quantile_tranformer import KDEQuantileTransformer
 from sklearn.base import BaseEstimator
 from sklearn.utils import check_array
-# from sklearn.utils.validation import check_is_fitted, FLOAT_DTYPES#, _deprecate_positional_args
+from sklearn.utils.validation import FLOAT_DTYPES # check_is_fitted, _deprecate_positional_args
 from sklearn.decomposition import PCA
 from sklearn.feature_selection import mutual_info_regression
 from sklearn.pipeline import make_pipeline
