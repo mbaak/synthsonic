@@ -24,6 +24,7 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
                  x_min=None,
                  x_max=None,
                  n_integral_bins=1000,
+                 use_KDE=True,
                  use_inverse_qt=False,
                  random_state=0,
                  copy=True):
@@ -66,6 +67,7 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         :param x_min: array. minimum value of pdf's x range. default is None (= - inf)
         :param x_max: array. maximum value of pdf's x range. default is None (= + inf)
         :param int n_integral_bins: for internal evaluation, number of integration bins beyond x-range. default is 1000.
+        :param bool use_KDE: Default is True. If false, KDE smoothing is off, using default quantile transformation.
         :param bool use_inverse_qt: Default is False. If true, KDE is not used in inverse transformation.
         :param int random_state: when an integer, the seed given random generator.
         :param copy: Copy the data before transforming. Default is True.
@@ -76,6 +78,7 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         self.n_adaptive = n_adaptive
         self.copy = copy
         self.use_inverse_qt = use_inverse_qt
+        self.use_KDE = use_KDE
         self.n_integral_bins = max(n_integral_bins, 1000)
         self.random_state = random_state
 
@@ -171,20 +174,23 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
                 self.x_min[i] = min_orig[i] if (self.x_min[i] is None and gstd[i] > 0) else self.x_min[i]
                 self.x_max[i] = max_orig[i] if (self.x_max[i] is None and gstd[i] > 0) else self.x_max[i]
 
-        # Do the actual KDE fit (to uniform distributions)
-        self._kde_fit(X)
+        if self.use_KDE:
+            # Do the actual KDE fit (to uniform distributions)
+            self._kde_fit(X)
+            # prepare X to do quantile transformer fit.
+            # add extreme points so QT knows the true edges for inverse transformation after sampling
+            X = self._kde_transform(X)
+            low = np.array([[0] * X.shape[1]])
+            high = np.array([[1] * X.shape[1]])
+            X = np.concatenate([X, low, high], axis=0)
+        elif self.smooth_peaks:
+            X = self._smooth_peaks(X)
 
         # quantile tranformation from kde may not always be perfect.
         # standard quantile transformer helps to smooth out any residual imperfections after kde transformation,
         # and does conversion to normal.
         self.qt_ = QuantileTransformer(n_quantiles=self.n_quantiles, output_distribution=self.output_distribution,
                                        copy=self.copy)
-        X = self._kde_transform(X)
-
-        # add extreme points so QT knows the true edges for inverse transformation after sampling
-        low = np.array([[0] * X.shape[1]])
-        high = np.array([[1] * X.shape[1]])
-        X = np.concatenate([X, low, high], axis=0)
         self.qt_.fit(X)
 
         return self
@@ -219,6 +225,26 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
             self.pdf_.append(pdf)
 
         return self
+
+    def _smooth_peaks(self, X):
+        """Internal function to smooth non-unique peaks
+
+        :param X: ndarray or sparse matrix, shape (n_samples, n_features)
+            The data used to scale along the features axis.
+        :return: ndarray or sparse matrix, shape (n_samples, n_features)
+            The transformed data
+        """
+        X = check_array(X, copy=self.copy, dtype=FLOAT_DTYPES, force_all_finite="allow-nan")
+
+        n_features = X.shape[1]
+        for feature_idx in range(n_features):
+            x = X[:, feature_idx]
+            # smooth peaks - note: this adds a random component to the data
+            # applying smoothing to data that's already been smoothed has no impact, b/c all peaks are already gone.
+            x = kde_smooth_peaks_1dim(x, self.mirror_left[feature_idx], self.mirror_right[feature_idx],
+                                      copy=False, random_state=self.random_state)
+            X[:, feature_idx] = x
+        return X
 
     def _kde_transform(self, X):
         """Internal function to transform the data
@@ -257,7 +283,11 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
             The transformed data
         """
         # 1. kde transformation to uniform.
-        X = self._kde_transform(X)
+        if self.use_KDE:
+            X = self._kde_transform(X)
+        elif self.smooth_peaks:
+            X = self._smooth_peaks(X)
+
         # 2. quantile transformation to smooth out residual bumps and do conversion to normal distribution
         return self.qt_.transform(X)
 
@@ -291,10 +321,10 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
             The inverse-transformed data
         """
         # 1. quantile transformation back to kde
-        if self.use_inverse_qt:
+        if self.use_inverse_qt or not self.use_KDE:
             X = self.qt_.inverse_transform(X)
         # 2. inverse kde transformation
-        return self._kde_inverse_transform(X)
+        return self._kde_inverse_transform(X) if self.use_KDE else X
 
     def jacobian(self, X):
         """Provide the Jacobian of the transformation
