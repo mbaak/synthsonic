@@ -41,7 +41,7 @@ def process(server_url: str, input_data: StringIO, categorical_columns: List[str
                       headers={'Content-Type': m.content_type},
                       timeout=8000)
 
-    return r.content.decode('utf-8')
+    return r.content.decode('utf-8'), r.elapsed.total_seconds()
 
 
 def get_data_download_link(data):
@@ -70,16 +70,17 @@ st.write('''Obtain synthetic data based on real data.''')  # description and ins
 input_data = st.sidebar.file_uploader('Insert CSV File (with header)')  # image upload widget
 
 if input_data is None:
-    st.warning("Insert not empty CSV!")
+    st.info(f"Insert not empty CSV with at least {INPUT_DATA_MIN_ROWS:,} rows.")
 else:
     real_df = _bytes_to_df(input_data.getvalue().encode('utf-8'))
     input_df_rows_count = real_df.shape[0]
     if input_df_rows_count < INPUT_DATA_MIN_ROWS:
-        st.error(f'Found only {input_df_rows_count} rows. At least {INPUT_DATA_MIN_ROWS} rows in input file is required.')
+        st.error(
+            f'Found only {input_df_rows_count} rows. At least {INPUT_DATA_MIN_ROWS} rows in input file is required.')
 
     else:
         st.markdown('### Raw data')
-        st.markdown(f'###### {input_df_rows_count} rows found')
+        st.markdown(f'###### **{input_df_rows_count:,}** rows found')
         st.markdown('---')
         st.write(real_df.head(DISPLAY_ROWS))
 
@@ -95,14 +96,15 @@ else:
         ordinal = set(ordinal)
 
         if st.sidebar.button('Get synthetic data') and input_data:
-            with st.spinner('Generating synthetic data...'):
-                synthetic_data_bytes = process(url + endpoint, input_data, categorical, ordinal, return_rows)
+            with st.spinner('Generating synthetic data :alembic:'):
+                synthetic_data_bytes, time_taken = process(url + endpoint, input_data, categorical, ordinal,
+                                                           return_rows)
                 data = StringIO(synthetic_data_bytes)
 
                 df = pd.read_csv(data)
 
             st.markdown('### Synthetic data')
-            st.markdown(f'###### {return_rows} rows generated')
+            st.markdown(f'###### **{return_rows:,}** rows generated in **{round(time_taken, 2):,}** seconds')
             st.markdown('---')
 
             st.write(df.head(DISPLAY_ROWS))
