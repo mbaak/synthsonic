@@ -1,3 +1,4 @@
+# +
 import numpy as np
 from src.models.kde_quantile_tranformer import KDEQuantileTransformer
 from sklearn.base import BaseEstimator
@@ -11,6 +12,10 @@ from sklearn.calibration import CalibratedClassifierCV
 import itertools
 import warnings
 
+from random import choices
+
+
+# -
 
 class KDECopulaNNPdf(BaseEstimator):
     """Kernel Density Estimation Copula NN PDF, models any data distribution
@@ -496,7 +501,7 @@ class KDECopulaNNPdf(BaseEstimator):
 
         return data, sample_weights
 
-    def sample_no_weights(self, n_samples=1, random_state=None):
+    def sample_no_weights(self, n_samples=1, random_state=None, mode='expensive'):
         """Generate random samples from the model.
 
         Use accept-reject to get rid of sample weights.
@@ -509,15 +514,45 @@ class KDECopulaNNPdf(BaseEstimator):
             random samples. Pass an int for reproducible results
             across multiple function calls. Ignored for now.
             See :term: `Glossary <random_state>`.
+        :param mode: str, 'expensive' samples 10x as many weighted
+            samples as requested and then runs accept-reject.
+            'cheap' generates minimal sample and drops or duplicates
+            entries to unweight them.
         :return: array_like, shape (n_samples, n_features)
             List of samples.
         """
-        data, sample_weights = self._sample_no_transform(n_samples, random_state)
+        
+        if mode=='expensive': #all samples are unique
+            
+            #estimate the acceptance ratio to estimate n_tries required to get 
+            #   desired sample size
+            tempdata, tempsample_weights = self._sample_no_transform(1000, random_state)
+            # apply accept-reject method
+            tempweight_max = np.max(tempsample_weights)
+            tempu = np.random.uniform(0, tempweight_max, size=1000)
+            tempkeep = tempu < tempsample_weights
+            tempdata = tempdata[tempkeep]
+            
+            accratio = tempdata.shape[0]/1000
+            n_tries = int(np.ceil(1/accratio*n_samples)) + 1000
+            
+            #n_tries = 10*n_samples
+            data, sample_weights = self._sample_no_transform(n_tries, random_state)
+            
+            # apply accept-reject method
+            weight_max = np.max(sample_weights)
+            u = np.random.uniform(0, weight_max, size=n_tries)
+            keep = u < sample_weights
+            data = data[keep]
+            
+            if data.shape[0] > n_samples:
+                data = data[:n_samples]
 
-        # apply accept-reject method
-        weight_max = np.max(sample_weights)
-        u = np.random.uniform(0, weight_max, size=n_samples)
-        keep = u < sample_weights
-        data = data[keep]
+        elif mode=='cheap': #generated samples are dropped or duplicated to match weights
+            data, sample_weights = self._sample_no_transform(n_samples, random_state)
+            pop = np.asarray(range(data.shape[0]))
+            probs = sample_weights/np.sum(sample_weights)
+            sample = choices(pop, probs, k=n_samples)
+            data = data[sample]
 
         return self.pipe_.inverse_transform(data)
