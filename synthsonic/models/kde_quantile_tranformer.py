@@ -2,7 +2,7 @@ import numpy as np
 from synthsonic.models.kde_utils import kde_process_data, kde_bw, kde_make_transformers, kde_smooth_peaks_1dim
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.utils import check_array
-from sklearn.utils.validation import check_is_fitted, FLOAT_DTYPES, _deprecate_positional_args
+# from sklearn.utils.validation import check_is_fitted, FLOAT_DTYPES, _deprecate_positional_args
 from sklearn.preprocessing import QuantileTransformer
 from scipy.stats import norm
 from scipy.special import erf
@@ -12,7 +12,7 @@ import warnings
 class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
     """ Quantile tranformer class using for each variable the CDF obtained with kernel density estimation
     """
-    @_deprecate_positional_args
+#     @_deprecate_positional_args
     def __init__(self,
                  n_quantiles=1000,
                  output_distribution='uniform',
@@ -228,7 +228,7 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         :return: ndarray or sparse matrix, shape (n_samples, n_features)
             The transformed data
         """
-        check_is_fitted(self)
+#         check_is_fitted(self)
 
         X = check_array(X, copy=self.copy, dtype=FLOAT_DTYPES, force_all_finite="allow-nan")
 
@@ -269,7 +269,7 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         :return: ndarray or sparse matrix, shape (n_samples, n_features)
             The inverse-transformed data
         """
-        check_is_fitted(self)
+#         check_is_fitted(self)
 
         n_features = X.shape[1]
         for feature_idx in range(n_features):
@@ -304,7 +304,7 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         :return: ndarray or sparse matrix, shape (n_samples, )
             An array with the jacobian of each data point
         """
-        check_is_fitted(self)
+#         check_is_fitted(self)
 
         X = check_array(X, copy=self.copy, dtype=FLOAT_DTYPES, force_all_finite="allow-nan")
 
@@ -329,7 +329,7 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         :return: ndarray or sparse matrix, shape (n_samples, )
             An array with the jacobian of the inverse transformation of each input data point
         """
-        check_is_fitted(self)
+#         check_is_fitted(self)
 
         X = check_array(X, copy=self.copy, dtype=FLOAT_DTYPES, force_all_finite="allow-nan")
 
