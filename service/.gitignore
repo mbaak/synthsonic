@@ -1,0 +1,6 @@
+.vscode/
+.devcontainer/
+*.pyc
+.venv
+build
+**/*whl

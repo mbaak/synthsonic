@@ -1,0 +1,26 @@
+version: '3'
+
+services:
+  api:
+    build: api/
+    ports:
+      - 8000:8000
+    networks:
+      - synthsonic
+    container_name: synthsonic-api
+
+  ui:
+    build: ui/
+    depends_on:
+      - api
+    ports:
+      - 80:8501
+    networks:
+      - synthsonic
+    container_name: synthsonic-ui
+    environment:
+      - API_URL=http://synthsonic-api:8000
+
+networks:
+  synthsonic:
+    driver: bridge
