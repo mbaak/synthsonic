@@ -47,6 +47,7 @@ class KDECopulaNNPdf(BaseEstimator):
                  clf=MLPClassifier(random_state=0, max_iter=300),
                  random_state=0,
                  use_inverse_qt=False,
+                 use_KDE=True,
                  copy=True):
         """Parameters of the KDECopulaNNPdf class
 
@@ -83,6 +84,8 @@ class KDECopulaNNPdf(BaseEstimator):
         :param clf: classifier used to model non-linear variable dependencies. Default is out-of-the-box
             MLPClassifier() from sklearn.
         :param int random_state: when an integer, the seed given random generator.
+        :param bool use_inverse_qt: Default is False. If true, KDE is not used in inverse transformation.
+        :param bool use_KDE: Default is True. If false, KDE smoothing is off, using default quantile transformation.
         :param copy: Copy the data before transforming. Default is True.
         """
         self.n_quantiles = n_quantiles
@@ -102,6 +105,7 @@ class KDECopulaNNPdf(BaseEstimator):
         self.copy = copy
         self.random_state = random_state
         self.use_inverse_qt = use_inverse_qt
+        self.use_KDE = use_KDE
         self.min_pdf_value = 1e-20
         self.max_scale_value = 500
 
@@ -158,7 +162,8 @@ class KDECopulaNNPdf(BaseEstimator):
                                                               n_adaptive=self.n_adaptive, x_min=self.x_min,
                                                               x_max=self.x_max, copy=self.copy,
                                                               random_state=self.random_state,
-                                                              use_inverse_qt=self.use_inverse_qt),
+                                                              use_inverse_qt=self.use_inverse_qt,
+                                                              use_KDE=self.use_KDE),
                                        PCA(n_components=n_features, whiten=False, copy=self.copy),
                                        KDEQuantileTransformer(n_quantiles=self.n_quantiles,
                                                               output_distribution='uniform', rho=min(self.rho, 0.2),
@@ -173,7 +178,8 @@ class KDECopulaNNPdf(BaseEstimator):
                                                               n_adaptive=self.n_adaptive, x_min=self.x_min,
                                                               x_max=self.x_max, copy=self.copy,
                                                               random_state=self.random_state,
-                                                              use_inverse_qt=self.use_inverse_qt))
+                                                              use_inverse_qt=self.use_inverse_qt,
+                                                              use_KDE=self.use_KDE))
         print(f'Transforming variables.')
         X_uniform = self.pipe_.fit_transform(X)
         # determine number of features to use for nonlinear modelling
