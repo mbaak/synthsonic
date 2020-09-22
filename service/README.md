@@ -29,6 +29,14 @@ API is configurable through env variables and enabled following configuration op
 * `DISPLAY_ROWS` - How many rows of data to show in UI. Default = 5.
 * `INPUT_DATA_MIN_ROWS` - Minimum number of rows in input data. Default = 1000.
 
+#### Documentation
+
+Documentation in form of Swagger UI (OpenAPI Specification) is available under:
+
+```shell script
+http://localhost:8000/docs
+```
+
 #### Running API
 
 ##### Localhost

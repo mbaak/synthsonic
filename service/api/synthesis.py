@@ -69,11 +69,8 @@ def get_data(bytes_data: bytes, categorical_columns: List[str] = [], ordinal_col
     _model = get_model(None, None)
     model = _model.fit(data)
 
-    x_gen, sample_weight = model.sample(rows)
-    x_gen[:, categorical_columns + ordinal_columns] = np.round(
-        x_gen[:, categorical_column_positions + ordinal_column_positions])
-    x_gen = np.float32(x_gen)
+    sample_data = model.sample_no_weights(rows, mode='expensive')
 
-    df = pd.DataFrame(x_gen, columns=input_df.columns)
+    df = pd.DataFrame(sample_data, columns=input_df.columns)
 
     return _df_to_bytes(df)
