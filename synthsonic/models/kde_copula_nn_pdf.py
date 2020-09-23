@@ -10,7 +10,6 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.calibration import CalibratedClassifierCV
 import itertools
 import warnings
-import inspect
 
 from random import choices
 
@@ -41,12 +40,11 @@ class KDECopulaNNPdf(BaseEstimator):
                  min_mutual_information=0,
                  n_nonlinear_vars=None,
                  force_uncorrelated=False,
-                 clf=MLPClassifier,
+                 clf=MLPClassifier(random_state=0, max_iter=1000, early_stopping=True),
                  random_state=0,
                  use_inverse_qt=False,
                  use_KDE=True,
-                 copy=True,
-                 **kwargs):
+                 copy=True):
         """Parameters of the KDECopulaNNPdf class
 
         KDECopulaNNPdf applies 7 steps to model any data distribution, where the variables are continuous:
@@ -105,12 +103,7 @@ class KDECopulaNNPdf(BaseEstimator):
         self.use_KDE = use_KDE
         self.min_pdf_value = 1e-20
         self.max_scale_value = 500
-
-        # instantiate classifier - passing on random_state
-        specs = inspect.getfullargspec(clf.__init__)
-        if 'random_state' in specs.args or specs.varkw == 'kwargs':
-            kwargs['random_state'] = self.random_state
-        self.clf = clf(**kwargs)
+        self.clf = clf
 
         # basic checks on attributes
         if self.min_pca_variance < 0 or self.min_pca_variance > 1:
