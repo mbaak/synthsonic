@@ -12,10 +12,10 @@ build-synthsonic:
 
 setup-api:	setup-env 	build-synthsonic
 	cd ..;cp ./dist/*whl /tmp/
-	. .venv/bin/activate; pip3 install -r api/requirements.txt
+	. .venv/bin/activate; pip3 install -r api/requirements.txt; pip3 install uvicorn
 
 setup-ui: 	setup-env
-	. .venv/bin/activate; pip3 install -r ui/requirements.txt
+	. .venv/bin/activate; pip3 install -r ui/requirements.txt; pip3 install streamlit
 
 run-api-local:	setup-api
 	uvicorn api.server:app --reload --host 0.0.0.0 --port 8000
