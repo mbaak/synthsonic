@@ -71,6 +71,11 @@ def get_data(bytes_data: bytes, categorical_columns: List[str] = [], ordinal_col
 
     sample_data = model.sample_no_weights(rows, mode='expensive')
 
+    sample_data[:, categorical_column_positions + ordinal_column_positions] = np.round(
+        sample_data[:, categorical_column_positions + ordinal_column_positions])
+
+    sample_data = np.float32(sample_data)
+
     df = pd.DataFrame(sample_data, columns=input_df.columns)
 
     return _df_to_bytes(df)
