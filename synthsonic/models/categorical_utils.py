@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from sklearn.preprocessing import OrdinalEncoder
 
 
 def categorical_round(data, cols):
@@ -51,3 +52,13 @@ def decode_one_hot(samples, columns, unique_values):
         assert np.max(indices) <= end_idx - start_idx
         recreated[:, col] = unique_values[col][indices]
     return recreated
+
+
+def encode_integer(data, categorical_columns):
+    enc = OrdinalEncoder()
+    encoded_data = enc.fit_transform(data[:, categorical_columns])
+    return encoded_data, enc
+
+
+def decode_integer(encoded_data, enc):
+    return enc.inverse_transform(encoded_data)
