@@ -46,35 +46,45 @@ def _find_col_postitions(df: pd.DataFrame, columns: List[str]) -> List[int]:
     return positions
 
 
-def get_model(x_min, x_max):
-    return KDECopulaNNPdf(x_min=x_min, x_max=x_max, rho=0.5,
-                          clf=MLPClassifier(random_state=0, max_iter=500, early_stopping=True))
+def get_model(**kwargs):
+    _classifier = kwargs.pop('classifier')
+
+    return KDECopulaNNPdf(**kwargs, rho=0.5, clf=get_classifier(_classifier))
 
 
-def get_data(bytes_data: bytes, categorical_columns: List[str] = [], ordinal_columns: List[str] = [],
-             rows: int = 5) -> bytes:
-    input_df = _bytes_to_df(bytes_data)
+def get_classifier(classifier):
+    if classifier == 'MLPClassifier':
+        return MLPClassifier(random_state=0, max_iter=500, early_stopping=True)
+    # elif classifier == 'XGBoost':
+    #     return XGBoost()
+    else:
+        return MLPClassifier(random_state=0, max_iter=500, early_stopping=True)
+
+
+def get_data(**kwargs) -> bytes:
+    input_df = _bytes_to_df(kwargs.get('bytes_data'))
 
     input_array = input_df.to_numpy()
 
-    categorical_column_positions = _find_col_postitions(input_df, categorical_columns)
-    ordinal_column_positions = _find_col_postitions(input_df, ordinal_columns)
+    categorical_column_positions = _find_col_postitions(input_df, kwargs.get('categorical_columns', []))
+    ordinal_column_positions = _find_col_postitions(input_df, kwargs.get('ordinal_columns', []))
 
-    data = np.float64(input_array)
+    data = input_array
 
     n_features = data.shape[1]
 
-    x_min, x_max = set_min_max(data, n_features)
+    # @todo use that if possible
+    # x_min, x_max = set_min_max(data, n_features)
 
-    _model = get_model(None, None)
+    # @todo remove x_*
+    kde_smoothing = kwargs.get('kde_smoothing', False)
+    model_args = dict(x_max=None, x_min=None, use_KDE=kde_smoothing,
+                      classifier=kwargs.get('classifier', 'MLPClassifier'))
+
+    _model = get_model(**model_args)
     model = _model.fit(data)
 
-    sample_data = model.sample_no_weights(rows, mode='expensive')
-
-    sample_data[:, categorical_column_positions + ordinal_column_positions] = np.round(
-        sample_data[:, categorical_column_positions + ordinal_column_positions])
-
-    sample_data = np.float32(sample_data)
+    sample_data = model.sample_no_weights(kwargs.get('rows', 5), mode='expensive')
 
     df = pd.DataFrame(sample_data, columns=input_df.columns)
 

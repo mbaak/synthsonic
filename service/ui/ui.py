@@ -1,10 +1,14 @@
 import base64
+import math
 from io import StringIO
 from os import getenv
 from typing import List
 
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import requests
+import seaborn as sns
 import streamlit as st
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
@@ -29,10 +33,13 @@ def _df_to_bytes(df: pd.DataFrame) -> bytes:
 
 
 def process(server_url: str, input_data: StringIO, categorical_columns: List[str], ordinal_columns: List[str],
-            rows: int) -> str:
+            kde_smoothing: bool, classifier: str, rows: int) -> str:
     m = MultipartEncoder(
-        fields={'rows': str(rows), 'ordinal_columns': ','.join(ordinal_columns),
+        fields={'rows': str(rows),
+                'ordinal_columns': ','.join(ordinal_columns),
                 'categorical_columns': ','.join(categorical_columns),
+                'kde_smoothing': str(kde_smoothing),
+                'classifier': classifier,
                 'file': ('filename', input_data, 'text/csv')}
     )
 
@@ -54,6 +61,32 @@ def get_data_download_link(data):
     href = f'##### <a href="data:file/csv;base64,{b64}">Download .csv</a>'
 
     return href
+
+
+def get_figure(original, processed):
+    columns = list(original.columns)
+    cols = 3
+    rows = math.ceil(len(columns) / cols)
+    fig, axes = plt.subplots(max(rows, 2), cols, figsize=(15, rows * 5), sharex=True)
+
+    for i in range(rows):
+        for j in range(cols):
+            col_nr = i * cols + j
+
+            if col_nr >= len(columns):
+                break
+            col = columns[col_nr]
+
+            _original = np.around(original[col], 4)
+            _processed = np.around(processed[col], 4)
+
+            ax = axes[i, j]
+
+            if original.dtypes[col] in [int, float]:
+                sns.distplot(_original, color="gray", ax=ax, hist=False)
+                sns.distplot(_processed, color='#f63366', ax=ax, hist=False)
+
+    return fig
 
 
 url = getenv('API_URL', 'http://localhost:8000')
@@ -84,6 +117,9 @@ else:
         st.markdown('---')
         st.write(real_df.head(DISPLAY_ROWS))
 
+        kde_smoothing = st.sidebar.checkbox('Use KDE Smoothing', value=False, key='kde_smoothing')
+        classifier = st.sidebar.selectbox('Select Classifier', ['MLPClassifier', 'XGBoost'])
+
         return_rows = st.sidebar.slider('Rows to generate',
                                         min_value=0,
                                         max_value=int(real_df.shape[0]) * 2,
@@ -98,17 +134,22 @@ else:
         if st.sidebar.button('Get synthetic data') and input_data:
             with st.spinner('Generating synthetic data :alembic:'):
                 synthetic_data_bytes, time_taken = process(url + endpoint, input_data, categorical, ordinal,
-                                                           return_rows)
+                                                           kde_smoothing, classifier, return_rows)
                 data = StringIO(synthetic_data_bytes)
 
-                df = pd.read_csv(data)
+                synthetic_df = pd.read_csv(data)
 
             st.markdown('### Synthetic data')
             st.markdown(f'###### **{return_rows:,}** rows generated in **{round(time_taken, 2):,}** seconds')
             st.markdown('---')
 
-            st.write(df.head(DISPLAY_ROWS))
-            st.markdown(get_data_download_link(df), unsafe_allow_html=True)
+            st.write(synthetic_df.head(DISPLAY_ROWS))
+            st.markdown(get_data_download_link(synthetic_df), unsafe_allow_html=True)
+
+            with st.spinner('Generating Comparisons :memo:'):
+                fig = get_figure(real_df, synthetic_df)
 
             st.markdown('### Comparison')
+            st.markdown(f'###### Distribution of numerical columns (original vs synthetic)')
             st.markdown('---')
+            st.plotly_chart(fig)
