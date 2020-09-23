@@ -2,7 +2,8 @@ import numpy as np
 import pytest
 
 from synthsonic.models.categorical_utils import encode_one_hot, decode_one_hot, \
-    categorical_frequency_mapping, categorical_frequency_inverse_mapping
+    categorical_frequency_mapping, categorical_frequency_inverse_mapping, encode_integer, \
+    decode_integer
 
 
 @pytest.fixture(scope='function')
@@ -35,3 +36,19 @@ def test_categorical_mapping(data):
     data, inv_mappings = categorical_frequency_mapping(data, columns)
 
     assert (categorical_frequency_inverse_mapping(data, columns, inv_mappings) == old_data[:, columns]).all()
+
+
+def test_encode_integer():
+    data = np.array([[1, 2, 3, 'text with space', 'AL', 'male'],
+                    [4, 5, 6, 'random text', 'TX', 'female'],
+                    [4, 5, 6, 'random different text', 'IL', 'na']])
+    categorical_cols = [3, 4, 5]
+    original_data = data[:, categorical_cols]
+    encoded_data, enc = encode_integer(data, categorical_cols)
+    encoded_test = np.array([[2., 0., 1.],
+                             [1., 2., 0.],
+                             [0., 1., 2.]])
+    decoded_data = decode_integer(encoded_data, enc)
+    assert np.allclose(encoded_data, encoded_test)
+    assert (original_data == decoded_data).all()
+
