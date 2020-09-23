@@ -18,10 +18,10 @@ setup-ui: 	setup-env
 	. .venv/bin/activate; pip3 install -r ui/requirements.txt; pip3 install streamlit
 
 run-api-local:	setup-api
-	uvicorn api.server:app --reload --host 0.0.0.0 --port 8000
+	. .venv/bin/activate; uvicorn api.server:app --reload --host 0.0.0.0 --port 8000
 
 run-ui-local:	setup-ui
-	streamlit run ui/ui.py
+	. .venv/bin/activate; streamlit run ui/ui.py
 
 run-all-docker:	build-synthsonic
 	cd ..;cp ./dist/*whl ./service/api/
