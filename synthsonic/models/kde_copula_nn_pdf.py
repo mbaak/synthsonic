@@ -1,4 +1,3 @@
-# +
 import numpy as np
 from synthsonic.models.kde_quantile_tranformer import KDEQuantileTransformer
 from sklearn.base import BaseEstimator
@@ -11,11 +10,10 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.calibration import CalibratedClassifierCV
 import itertools
 import warnings
+import inspect
 
 from random import choices
 
-
-# -
 
 class KDECopulaNNPdf(BaseEstimator):
     """Kernel Density Estimation Copula NN PDF, models any data distribution
@@ -29,7 +27,6 @@ class KDECopulaNNPdf(BaseEstimator):
     6. NN classifier to model the copula space of the selected top-n variables.
     7. Recalibration of classifier probabilities.
     """
-    #   @_deprecate_positional_args
     def __init__(self,
                  n_quantiles=500,
                  mirror_left=None,
@@ -44,11 +41,12 @@ class KDECopulaNNPdf(BaseEstimator):
                  min_mutual_information=0,
                  n_nonlinear_vars=None,
                  force_uncorrelated=False,
-                 clf=MLPClassifier(random_state=0, max_iter=300),
+                 clf=MLPClassifier,
                  random_state=0,
                  use_inverse_qt=False,
                  use_KDE=True,
-                 copy=True):
+                 copy=True,
+                 **kwargs):
         """Parameters of the KDECopulaNNPdf class
 
         KDECopulaNNPdf applies 7 steps to model any data distribution, where the variables are continuous:
@@ -101,13 +99,18 @@ class KDECopulaNNPdf(BaseEstimator):
         self.min_mutual_information = min_mutual_information
         self.n_nonlinear_vars = n_nonlinear_vars
         self.force_uncorrelated = force_uncorrelated
-        self.clf = clf
         self.copy = copy
         self.random_state = random_state
         self.use_inverse_qt = use_inverse_qt
         self.use_KDE = use_KDE
         self.min_pdf_value = 1e-20
         self.max_scale_value = 500
+
+        # instantiate classifier - passing on random_state
+        specs = inspect.getfullargspec(clf.__init__)
+        if 'random_state' in specs.args or specs.varkw == 'kwargs':
+            kwargs['random_state'] = self.random_state
+        self.clf = clf(**kwargs)
 
         # basic checks on attributes
         if self.min_pca_variance < 0 or self.min_pca_variance > 1:
@@ -228,8 +231,6 @@ class KDECopulaNNPdf(BaseEstimator):
             corresponds to a single data point.
         :return: array of Copula densities for all data points.
         """
-#         check_is_fitted(self)
-
         # trivial case
         n_samples = X.shape[0]
         if self.n_vars_ <= 1 or self.force_uncorrelated or self.clf is None:
@@ -379,7 +380,6 @@ class KDECopulaNNPdf(BaseEstimator):
             probability densities, so values will be low for high-dimensional
             data.
         """
-#         check_is_fitted(self)
         X = check_array(X, copy=self.copy, dtype=FLOAT_DTYPES, force_all_finite="allow-nan")
 
         n_features = X.shape[1]
@@ -480,7 +480,6 @@ class KDECopulaNNPdf(BaseEstimator):
             List of samples, sample weights
         """
         # trivial checks
-#         check_is_fitted(self)
         if not (self.n_vars_ > 0 or self.n_resid_vars_ > 0):
             raise RuntimeError('pdf not configured for sample generation.')
 
