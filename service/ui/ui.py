@@ -33,12 +33,12 @@ def _df_to_bytes(df: pd.DataFrame) -> bytes:
 
 
 def process(server_url: str, input_data: StringIO, categorical_columns: List[str], ordinal_columns: List[str],
-            kde_smoothing: bool, classifier: str, rows: int) -> str:
+            use_grid_search: bool, classifier: str, rows: int) -> str:
     m = MultipartEncoder(
         fields={'rows': str(rows),
                 'ordinal_columns': ','.join(ordinal_columns),
                 'categorical_columns': ','.join(categorical_columns),
-                'kde_smoothing': str(kde_smoothing),
+                'use_grid_search': str(use_grid_search),
                 'classifier': classifier,
                 'file': ('filename', input_data, 'text/csv')}
     )
@@ -117,8 +117,8 @@ else:
         st.markdown('---')
         st.write(real_df.head(DISPLAY_ROWS))
 
-        kde_smoothing = st.sidebar.checkbox('Use KDE Smoothing', value=False, key='kde_smoothing')
-        classifier = st.sidebar.selectbox('Select Classifier', ['MLPClassifier', 'XGBoost'])
+        use_grid_search = st.sidebar.checkbox('Use Grid Search', value=False, key='use_grid_search')
+        classifier = st.sidebar.selectbox('Select Classifier', ['MLP', 'XGBoost'])
 
         return_rows = st.sidebar.slider('Rows to generate',
                                         min_value=0,
@@ -134,7 +134,7 @@ else:
         if st.sidebar.button('Get synthetic data') and input_data:
             with st.spinner('Generating synthetic data :alembic:'):
                 synthetic_data_bytes, time_taken = process(url + endpoint, input_data, categorical, ordinal,
-                                                           kde_smoothing, classifier, return_rows)
+                                                           use_grid_search, classifier, return_rows)
                 data = StringIO(synthetic_data_bytes)
 
                 synthetic_df = pd.read_csv(data)

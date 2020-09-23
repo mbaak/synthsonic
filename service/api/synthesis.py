@@ -1,9 +1,11 @@
 from io import StringIO
 from typing import List
-
 import numpy as np
+
 import pandas as pd
+from sklearn.model_selection import GridSearchCV
 from sklearn.neural_network import MLPClassifier
+from xgboost import XGBClassifier
 
 from synthsonic.models.kde_copula_nn_pdf import KDECopulaNNPdf
 
@@ -49,16 +51,22 @@ def _find_col_postitions(df: pd.DataFrame, columns: List[str]) -> List[int]:
 def get_model(**kwargs):
     _classifier = kwargs.pop('classifier')
 
-    return KDECopulaNNPdf(**kwargs, rho=0.5, clf=get_classifier(_classifier))
+    classifier, _ht_false, _ht_true = get_classifier(_classifier)
+
+    return KDECopulaNNPdf(**kwargs, rho=0.5, clf=classifier(**_ht_false)), classifier, _ht_false, _ht_true
 
 
 def get_classifier(classifier):
-    if classifier == 'MLPClassifier':
-        return MLPClassifier(random_state=0, max_iter=500, early_stopping=True)
-    # elif classifier == 'XGBoost':
-    #     return XGBoost()
-    else:
-        return MLPClassifier(random_state=0, max_iter=500, early_stopping=True)
+    # _hyper_tune_true params will be passed to grid search (if selected) or used as-is if not using grid search
+    # _hyper_tune_false params are not subject of hypertuning
+    if classifier == 'MLP':
+        _hyper_tune_false = dict(random_state=0, max_iter=500, early_stopping=True)
+        _hyper_tune_true = dict(clf__alpha=10.0 ** -np.arange(1, 3))
+        return MLPClassifier, _hyper_tune_false, _hyper_tune_true
+    elif classifier == 'XGBoost':
+        _hyper_tune_false = dict()
+        _hyper_tune_true = dict(clf__max_depth=[3, 6])
+        return XGBClassifier, _hyper_tune_false, _hyper_tune_true
 
 
 def get_data(**kwargs) -> bytes:
@@ -76,12 +84,36 @@ def get_data(**kwargs) -> bytes:
     # @todo use that if possible
     # x_min, x_max = set_min_max(data, n_features)
 
-    # @todo remove x_*
-    kde_smoothing = kwargs.get('kde_smoothing', False)
-    model_args = dict(x_max=None, x_min=None, use_KDE=kde_smoothing,
-                      classifier=kwargs.get('classifier', 'MLPClassifier'))
+    use_grid_search = kwargs.get('use_grid_search', False)
+    model_args = dict(x_max=None, x_min=None, use_KDE=False)
 
-    _model = get_model(**model_args)
+    _clf_params = {}
+
+    # clf_params_base = dict(random_state=0, max_iter=500, early_stopping=True)
+    # clf_params_before_tuning = dict(clf__alpha=10.0 ** -np.arange(1, 3))
+    #
+    # clf_params.update(clf_params_base)
+    #
+    # # MLP Classifier  dict(clf__alpha=10.0 ** -np.arange(1, 3))
+    # # XGBoost
+
+    _model, _classifier, _clf_ht_false, _clf_ht_true = get_model(**dict(classifier=kwargs.get('classifier')))
+
+    if use_grid_search:
+        grid = GridSearchCV(_model, _clf_ht_true, cv=5)
+        grid.fit(data)
+
+        clf_params_tuned = {k.replace('clf__', ''): v for k, v in grid.best_params_.items()}
+
+        _clf_params.update(clf_params_tuned)
+
+    _clf_params.update(_clf_ht_false)
+    clf_params = {k.replace('clf__', ''): v for k, v in _clf_params.items()}
+
+    print(clf_params)
+
+    _model = KDECopulaNNPdf(**model_args, rho=0.5, clf=_classifier(**clf_params))
+
     model = _model.fit(data)
 
     sample_data = model.sample_no_weights(kwargs.get('rows', 5), mode='expensive')
