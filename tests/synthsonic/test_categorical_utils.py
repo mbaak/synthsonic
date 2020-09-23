@@ -25,7 +25,8 @@ def test_categorical_one_hot(data):
 
     # Start idx is used when other variable types are present
     start_idx = 0
-    recreated[:, columns] = decode_one_hot(encoded[:, start_idx:], columns, unique_values)
+    recreated[:, columns] = decode_one_hot(encoded[:, start_idx:], columns, unique_values,
+                                           len(columns))
     assert (recreated == data).all()
 
 
