@@ -37,17 +37,18 @@ def categorical_frequency_inverse_mapping(data, columns, inv_mappings):
 def encode_one_hot(df, cols):
     categorical_data = pd.DataFrame(df[:, cols], columns=cols)
     one_hot_encoded = pd.get_dummies(data=categorical_data, columns=cols).values
-    unique_values = [np.unique(df[:, col]) for col in cols]
+    unique_values = categorical_data.apply(pd.Series.unique)
+    unique_values = unique_values.apply(sorted)
+    unique_values = unique_values.apply(np.array)
     return unique_values, one_hot_encoded
 
 
-def decode_one_hot(samples, columns, unique_values):
-    recreated = np.empty((samples.shape[0], len(columns)))
+def decode_one_hot(samples, columns, unique_values, n_features):
+    recreated = np.empty((samples.shape[0], n_features))
     end_idx = 0
     for col in columns:
         start_idx = end_idx
         end_idx = start_idx + len(unique_values[col])
-
         indices = samples[:, start_idx : end_idx].argmax(axis=1).astype(int)
         assert np.max(indices) <= end_idx - start_idx
         recreated[:, col] = unique_values[col][indices]
