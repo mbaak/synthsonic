@@ -87,3 +87,13 @@ target/
 
 # Mypy cache
 .mypy_cache/
+
+# Paper LaTeX building files
+paper/paper.aux
+paper/paper.bbl
+paper/paper.blg
+paper/paper.fdb_latexmk
+paper/paper.fls
+paper/paper.out
+paper/paper.synctex.gz
+

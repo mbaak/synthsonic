@@ -41,16 +41,31 @@
 % \AND instead of \And before the third author name.
 
 \author{%
-  Max Baak \\
-  ING Bank\\
+  Max Baak
+  % examples of more authors
+   \And
+Szymon Adamala
+   \And
+Simon Brugman
+   \And
+Federico Calore
+   \And
+Lorraine D'Almeida
+   \And
+Ilan Fridman Rojas
+   \And
+Mariusz Gorski
+   \And
+Mykhailo Grytsai
+   \And
+Marcin Kujawa \\ \\ \\
+ ING Bank\\
   Wholesale Banking Advanced Analytics (WBAA)\\
   Bijlmerdreef 106\\
 1102 CT Amsterdam\\ 
 Netherlands\\
   \texttt{Max.Baak@ing.com} \\
-  % examples of more authors
-  % \And
-  % Coauthor \\
+ % Coauthor \\
   % Affiliation \\
   % Address \\
   % \texttt{email} \\
@@ -76,7 +91,7 @@ Netherlands\\
 \maketitle
 
 \begin{abstract}
-  Current state-of-the-art approaches towards generating synthetic versions of real, tabular, approximately i.i.d. data by and large make use of the immense progress and representational power of Generative Adversarial Networks and Variational AutoEncoders. We present an approach to the problem which generates results comparable or superior to the existing approaches, with a computational cost an order of magnitude (\&\&\& CHECK THIS FROM SIMON'S RESULTS) lower.
+  Current state-of-the-art approaches towards generating synthetic versions of real, tabular, approximately i.i.d. data by and large make use of the immense progress and representational power of Generative Adversarial Networks and Variational AutoEncoders. We present an approach to the problem which generates results comparable or superior to the existing approaches, with a lower computational cost.
 \end{abstract}
 
 \section{Introduction}
@@ -158,10 +173,17 @@ Show at least one multi-modal fit as well
 \label{outlook-section}
 
 Improve treatment of categoricals?  
-Further improvements on best choice of classifier  
-Anything else  
 
-SECTIONS BELOW STILL TO BE FILLED OUT, BUT ARE PRO FORMA
+Further improvements on best choice of classifier  
+
+How to deal with missing values  
+
+The scoring rule used by SDGym does not seem to be strictly proper? Read up on this and perhaps comment, this paper is most relevent, and section 6.4 in it suggests possible alternatives it seems! ~\cite{gneiting2007strictly}.
+
+Anything else?   
+
+\newpage
+SECTIONS BELOW STILL TO BE FILLED OUT, BUT ARE PRO FORMA AND SPECIFIC TO NeurIPS
 
 
 \section*{Broader Impact}
