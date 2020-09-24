@@ -10,6 +10,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.calibration import CalibratedClassifierCV
 import itertools
 import warnings
+from scipy import interpolate
 
 from random import choices
 
@@ -214,7 +215,22 @@ class KDECopulaNNPdf(BaseEstimator):
         y = np.concatenate([zeros, ones], axis=None)
 
         self.clf = self.clf.fit(X, y)
-        self.calibrated_ = CalibratedClassifierCV(self.clf, cv="prefit").fit(X, y)
+        self.train_data = (X, y)
+
+        # Calibrate probabilities manually. (Used for weights calculation.)
+        X0 = np.random.uniform(size=(1000000, X1.shape[1]))
+        p0 = self.clf.predict_proba(X0)[:, 1]
+        p1 = self.clf.predict_proba(X1)[:, 1]
+
+        hist_p0, bin_edges = np.histogram(p0, bins=100, range=(0, 1))
+        hist_p1, bin_edges = np.histogram(p1, bins=100, range=(0, 1))
+        bin_centers = bin_edges[:-1] + 0.005
+
+        hnorm_p0 = hist_p0 / sum(hist_p0)
+        hnorm_p1 = hist_p1 / sum(hist_p1)
+        hnorm_sum = hnorm_p0 + hnorm_p1
+        p1cb = np.divide(hnorm_p1, hnorm_sum, out=np.zeros_like(hnorm_p1), where=hnorm_sum != 0)
+        self.p1f_ = interpolate.interp1d(bin_centers, p1cb, kind='linear', bounds_error=False, fill_value=(0, 1))
 
     def _scale(self, X):
         """ Determine density of the Copula space for input data points
@@ -229,9 +245,9 @@ class KDECopulaNNPdf(BaseEstimator):
         if self.n_vars_ <= 1 or self.force_uncorrelated or self.clf is None:
             return np.ones(n_samples)
 
-        prob = self.calibrated_.predict_proba(X)
-        nominator = prob[:, 1]
-        denominator = prob[:, 0]
+        prob = self.clf.predict_proba(X)[:, 1]
+        nominator = self.p1f_(prob)
+        denominator = 1. - nominator
         # calculate ratio. In case denominator is zero, return 1 as ratio.
         ratio = np.divide(nominator, denominator, out=np.ones_like(nominator), where=denominator != 0)
         return np.array([r if r < self.max_scale_value else self.max_scale_value for r in ratio])
