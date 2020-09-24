@@ -67,7 +67,7 @@ def get_figure(original, processed):
     columns = list(original.columns)
     cols = 3
     rows = math.ceil(len(columns) / cols)
-    fig, axes = plt.subplots(max(rows, 2), cols, figsize=(15, rows * 5))
+    fig, axes = plt.subplots(max(rows, 2), cols, figsize=(15, rows * 5), sharex=True)
 
     for i in range(rows):
         for j in range(cols):
@@ -131,6 +131,7 @@ else:
         categorical = set(categorical)
         ordinal = set(ordinal)
 
+        additional_stats = st.sidebar.checkbox('With additional stats', value=False, key='additional_stats')
         if st.sidebar.button('Get synthetic data') and input_data:
             with st.spinner('Generating synthetic data :alembic:'):
                 synthetic_data_bytes, time_taken = process(url + endpoint, input_data, categorical, ordinal,
@@ -153,3 +154,19 @@ else:
             st.markdown(f'###### Distribution of numerical columns (original vs synthetic)')
             st.markdown('---')
             st.plotly_chart(fig)
+
+            if additional_stats:
+                from pandas_profiling import ProfileReport
+                from additional_stats import get_xlsx_markdown
+                from streamlit_pandas_profiling import st_profile_report
+
+                st.info("Additional statistics")
+                st.markdown(get_xlsx_markdown(real_df, synthetic_df), unsafe_allow_html=True)
+
+                st.info("Original data profile")
+                real_profile = ProfileReport(real_df, title="Original Dataset Profiling Report", explorative=True)
+                st_profile_report(real_profile)
+
+                st.info("Synthetic data profile")
+                synthetic_profile = ProfileReport(synthetic_df, title="Synthetic Dataset Profiling Report", explorative=True)
+                st_profile_report(synthetic_profile)
