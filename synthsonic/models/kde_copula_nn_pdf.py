@@ -8,6 +8,7 @@ from sklearn.feature_selection import mutual_info_regression
 from sklearn.pipeline import make_pipeline
 from sklearn.neural_network import MLPClassifier
 from sklearn.calibration import CalibratedClassifierCV
+from sklearn.model_selection import train_test_split
 import itertools
 import warnings
 from scipy import interpolate
@@ -193,34 +194,35 @@ class KDECopulaNNPdf(BaseEstimator):
 
         return self
 
-    def _configure_classifier(self, X1):
+    def _configure_classifier(self, X1, test_size=0.4):
         """ The neural network below captures the residual non-linearity after the transformations above.
 
         :param X1: array_like, shape (n_samples, n_features)
             List of n_features-dimensional data points to be modelled.  Each row
             corresponds to a single data point.
+        :param float test_size: fraction of X1 used for probability calibration. Default is 0.4.
         """
         # fitting uniform data sample vs observed data
 
         # set random state
         np.random.seed(self.random_state)
 
-        # make training sample
-        X0 = np.random.uniform(size=X1.shape)
-        X = np.concatenate([X0, X1], axis=0)
+        # make training sample and labels
+        # use test sample below for probability calibration.
+        X1_train, X1_test, y1_train, y1_test = train_test_split(X1, np.ones(X1.shape[0]), test_size=test_size,
+                                                                random_state=self.random_state)
+        X0_train = np.random.uniform(size=X1_train.shape)
+        X_train = np.concatenate([X0_train, X1_train], axis=0)
+        y_train = np.concatenate([np.zeros(X1_train.shape[0]), y1_train], axis=None)
 
-        # make training labels
-        zeros = np.zeros(X1.shape[0])
-        ones = np.ones(X1.shape[0])
-        y = np.concatenate([zeros, ones], axis=None)
-
-        self.clf = self.clf.fit(X, y)
-        self.train_data = (X, y)
+        self.clf = self.clf.fit(X_train, y_train)
+        # self.train_data = (X_train, y_train)
+        # self.test_data = (X1_test, y1_test)
 
         # Calibrate probabilities manually. (Used for weights calculation.)
-        X0 = np.random.uniform(size=(1000000, X1.shape[1]))
-        p0 = self.clf.predict_proba(X0)[:, 1]
-        p1 = self.clf.predict_proba(X1)[:, 1]
+        X0_test = np.random.uniform(size=(1000000, X1.shape[1]))
+        p0 = self.clf.predict_proba(X0_test)[:, 1]
+        p1 = self.clf.predict_proba(X1_test)[:, 1]
 
         hist_p0, bin_edges = np.histogram(p0, bins=100, range=(0, 1))
         hist_p1, bin_edges = np.histogram(p1, bins=100, range=(0, 1))
