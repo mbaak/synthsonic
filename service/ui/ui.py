@@ -67,7 +67,7 @@ def get_figure(original, processed):
     columns = list(original.columns)
     cols = 3
     rows = math.ceil(len(columns) / cols)
-    fig, axes = plt.subplots(max(rows, 2), cols, figsize=(15, rows * 5), sharex=True)
+    fig, axes = plt.subplots(max(rows, 2), cols, figsize=(15, rows * 5))
 
     for i in range(rows):
         for j in range(cols):
