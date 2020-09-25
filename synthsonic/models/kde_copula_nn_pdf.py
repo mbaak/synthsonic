@@ -414,7 +414,8 @@ class KDECopulaNNPdf(BaseEstimator):
         p = self._scale(U_slice)
 
         # 2. multiply with the inverse jacobian of the first kde transformation
-        p /= self.pipe_[0].jacobian(X)
+        jac = self.pipe_[0].jacobian(X)
+        p = p / jac
 
         if self.do_PCA and n_features >= 2 and not self.force_uncorrelated:
             # 3. multiply with the (inverse) jacobian of the second kde transformation
