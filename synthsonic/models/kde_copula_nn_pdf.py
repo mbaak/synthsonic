@@ -9,6 +9,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.neural_network import MLPClassifier
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import train_test_split
+from sklearn.isotonic import IsotonicRegression
 import itertools
 import warnings
 from scipy import interpolate
@@ -194,7 +195,7 @@ class KDECopulaNNPdf(BaseEstimator):
 
         return self
 
-    def _configure_classifier(self, X1, test_size=0.4):
+    def _configure_classifier(self, X1, test_size=0.35):
         """ The neural network below captures the residual non-linearity after the transformations above.
 
         :param X1: array_like, shape (n_samples, n_features)
@@ -232,7 +233,16 @@ class KDECopulaNNPdf(BaseEstimator):
         hnorm_p1 = hist_p1 / sum(hist_p1)
         hnorm_sum = hnorm_p0 + hnorm_p1
         p1cb = np.divide(hnorm_p1, hnorm_sum, out=np.zeros_like(hnorm_p1), where=hnorm_sum != 0)
-        self.p1f_ = interpolate.interp1d(bin_centers, p1cb, kind='linear', bounds_error=False, fill_value=(0, 1))
+        # self.p1cb = p1cb, bin_centers
+
+        # use isotonic regression to smooth out potential fluctuations in the p1 values
+        # isotonic regression assumes that p1 can only be a rising function.
+        # I’m assuming that if a classifier predicts a higher probability, the calibrated probability
+        # will also be higher. This may not always be right, but I think generally it is a safe one.
+        iso_reg = IsotonicRegression().fit(bin_centers, p1cb)
+        p1pred = iso_reg.predict(bin_centers)
+
+        self.p1f_ = interpolate.interp1d(bin_centers, p1pred, kind='linear', bounds_error=False, fill_value=(0, 1))
 
     def _scale(self, X):
         """ Determine density of the Copula space for input data points
