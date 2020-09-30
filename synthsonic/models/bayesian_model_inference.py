@@ -90,13 +90,13 @@ class BayesianModelProbability(BayesianModelInference):
             evidence_no[:, i] = vec_translate(evidence_val[:, i], cpd.name_to_no[ev])
 
         if evidence:
-            # there are conditional dependencies E for x[n]
+            # there are conditional dependencies E for x[n] for this node
             # Here we retrieve the array: p(x[n]|E). We do this for each x in X.
             # We pick the specific node value from the arrays below.
             cached_values = self.pre_compute_reduce(variable=node)
             weights = np.array([cached_values[tuple(en)] for en in evidence_no])
         else:
-            # there are NO conditional dependencies E
+            # there are NO conditional dependencies for this node
             # retrieve array: p(x[n]).  We do this for each x in X.
             # We pick the specific node value from the arrays below.
             weights = np.array([cpd.values] * len(X))
