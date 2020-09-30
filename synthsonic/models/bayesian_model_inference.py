@@ -1,6 +1,7 @@
 from pgmpy.inference import Inference
 from pgmpy.models import BayesianModel
 import networkx as nx
+import itertools
 
 
 class BayesianModelInference(Inference):
@@ -68,6 +69,29 @@ class BayesianModelInference(Inference):
         probability_node = np.take_along_axis(weights, current_no, axis=None)
 
         return np.log(probability_node)
+
+    def pre_compute_reduce(self, variable):
+        """Get probability arrays for a node as function of conditional dependencies
+
+        Internal function used for Bayesian networks, eg. in BayesianModelSampling
+        and BayesianModelInference.
+
+        :param variable: node of the Bayesian network
+        :return: dict with probability array for node as function of conditional dependency values
+        """
+        variable_cpd = self.model.get_cpds(variable)
+        variable_evid = variable_cpd.variables[:0:-1]
+        cached_values = {}
+
+        for state_combination in itertools.product(
+            *[range(self.cardinality[var]) for var in variable_evid]
+        ):
+            states = list(zip(variable_evid, state_combination))
+            cached_values[state_combination] = variable_cpd.reduce(
+                states, inplace=False
+            ).values
+
+        return cached_values
 
     def log_probability(self, X, columns):
         """Evaluate the logarithmic probability of each point in a data set.
