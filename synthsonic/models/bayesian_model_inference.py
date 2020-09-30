@@ -39,13 +39,13 @@ class BayesianModelInference(Inference):
 
         cpd = self.model.get_cpds(node)
 
-        # direct variable: x[n], where n is the node
+        # variable to probe: x[n], where n is the node number
         current = cpd.variables[0]
         current_idx = columns.index(current)
         current_val = X[:, current_idx]
         current_no = vec_translate(current_val, cpd.name_to_no[current])
 
-        # conditional dependencies E of the direct variable
+        # conditional dependencies E of the probed variable
         evidence = cpd.variables[:0:-1]
         evidence_idx = [columns.index(ev) for ev in evidence]
         evidence_val = X[:, evidence_idx]
@@ -54,18 +54,19 @@ class BayesianModelInference(Inference):
             evidence_no[:, i] = vec_translate(evidence_val[:, i], cpd.name_to_no[ev])
 
         if evidence:
-            # there are conditional dependencies E
-            # Here we retrieve array: p(x[n]|E). We do this for each x in X.
-            # We pick the specific node value below of the arrays below.
+            # there are conditional dependencies E for x[n]
+            # Here we retrieve the array: p(x[n]|E). We do this for each x in X.
+            # We pick the specific node value from the arrays below.
             cached_values = self.pre_compute_reduce(variable=node)
             weights = np.array([cached_values[tuple(en)] for en in evidence_no])
         else:
             # there are NO conditional dependencies E
             # retrieve array: p(x[n]).  We do this for each x in X.
-            # We pick the specific node value below of the array below.
+            # We pick the specific node value from the arrays below.
             weights = np.array([cpd.values] * len(X))
 
-        # pick the specific node value x[n] from the array p(x[n]|E) or p(x[n]), for each x in X.
+        # pick the specific node value x[n] from the array p(x[n]|E) or p(x[n])
+        # We do this for each x in X.
         probability_node = np.take_along_axis(weights, current_no, axis=None)
 
         return np.log(probability_node)
@@ -75,6 +76,8 @@ class BayesianModelInference(Inference):
 
         Internal function used for Bayesian networks, eg. in BayesianModelSampling
         and BayesianModelInference.
+
+        MOVE THIS FUNCTION TO THE INFERENCE CLASS TO AVOID DUPLICATION
 
         :param variable: node of the Bayesian network
         :return: dict with probability array for node as function of conditional dependency values
