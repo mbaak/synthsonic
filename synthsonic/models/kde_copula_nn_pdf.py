@@ -248,26 +248,8 @@ class KDECopulaNNPdf(BaseEstimator):
         # will also be higher. This may not always be right, but I think generally it is a safe one.
         iso_reg = IsotonicRegression().fit(bin_centers, p1cb)
         p1pred = iso_reg.predict(bin_centers)
-
-        self.p1f_ = interpolate.interp1d(bin_centers, p1pred, kind='linear', bounds_error=False,
+        self.p1f_ = interpolate.interp1d(bin_edges[:-1], p1pred, kind='previous', bounds_error=False,
                                          fill_value="extrapolate")
-
-        # check edge points 0 and 1, which are based on extrapolation.
-        # correct if out of bound by adding dummy edge points
-        p1_edges = self.p1f_([0, 1])
-        if p1_edges[0] < 0 or p1_edges[1] > 1:
-            bc_extend = [bin_centers]
-            p1_extend = [p1pred]
-            if p1_edges[0] < 0:
-                bc_extend.insert(0, [0])
-                p1_extend.insert(0, [0])
-            if p1_edges[1] > 1:
-                bc_extend.append([1])
-                p1_extend.append([1])
-            bin_centers = np.concatenate(bc_extend, axis=None)
-            p1pred = np.concatenate(p1_extend, axis=None)
-            self.p1f_ = interpolate.interp1d(bin_centers, p1pred, kind='linear', bounds_error=False,
-                                             fill_value="extrapolate")
 
     def _scale(self, X):
         """ Determine density of the Copula space for input data points
