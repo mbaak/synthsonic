@@ -5,7 +5,7 @@ import itertools
 
 
 class BayesianModelInference(Inference):
-    """Class to calculate probability (pmf) values specific to Bayesian Models
+    """Inference class specific to Bayesian Models
     """
 
     def __init__(self, model):
@@ -18,6 +18,41 @@ class BayesianModelInference(Inference):
         super(BayesianModelInference, self).__init__(model)
 
         self.topological_order = list(nx.topological_sort(model))
+
+    def pre_compute_reduce(self, variable):
+        """Get probability arrays for a node as function of conditional dependencies
+
+        Internal function used for Bayesian networks, eg. in BayesianModelSampling
+        and BayesianModelProbability.
+
+        :param variable: node of the Bayesian network
+        :return: dict with probability array for node as function of conditional dependency values
+        """
+        variable_cpd = self.model.get_cpds(variable)
+        variable_evid = variable_cpd.variables[:0:-1]
+        cached_values = {}
+
+        for state_combination in itertools.product(
+                *[range(self.cardinality[var]) for var in variable_evid]
+        ):
+            states = list(zip(variable_evid, state_combination))
+            cached_values[state_combination] = variable_cpd.reduce(
+                states, inplace=False
+            ).values
+
+        return cached_values
+
+
+class BayesianModelProbability(BayesianModelInference):
+    """Class to calculate probability (pmf) values specific to Bayesian Models
+    """
+
+    def __init__(self, model):
+        """Class to calculate probability (pmf) values specific to Bayesian Models
+
+        :param model: instance of BayesianModel model on which inference queries will be computed
+        """
+        super(BayesianModelProbability, self).__init__(model)
 
     def _log_probability_node(self, X, columns, node):
         """Evaluate the log probability of each datapoint for a specific node.
@@ -34,6 +69,7 @@ class BayesianModelInference(Inference):
             probability densities, so values will be low for high-dimensional
             data.
         """
+
         def vec_translate(a, my_dict):
             return np.vectorize(my_dict.__getitem__)(a)
 
@@ -70,31 +106,6 @@ class BayesianModelInference(Inference):
         probability_node = np.take_along_axis(weights, current_no, axis=None)
 
         return np.log(probability_node)
-
-    def pre_compute_reduce(self, variable):
-        """Get probability arrays for a node as function of conditional dependencies
-
-        Internal function used for Bayesian networks, eg. in BayesianModelSampling
-        and BayesianModelInference.
-
-        MOVE THIS FUNCTION TO THE INFERENCE CLASS TO AVOID DUPLICATION
-
-        :param variable: node of the Bayesian network
-        :return: dict with probability array for node as function of conditional dependency values
-        """
-        variable_cpd = self.model.get_cpds(variable)
-        variable_evid = variable_cpd.variables[:0:-1]
-        cached_values = {}
-
-        for state_combination in itertools.product(
-            *[range(self.cardinality[var]) for var in variable_evid]
-        ):
-            states = list(zip(variable_evid, state_combination))
-            cached_values[state_combination] = variable_cpd.reduce(
-                states, inplace=False
-            ).values
-
-        return cached_values
 
     def log_probability(self, X, columns):
         """Evaluate the logarithmic probability of each point in a data set.
