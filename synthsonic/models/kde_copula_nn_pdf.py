@@ -41,6 +41,7 @@ class KDECopulaNNPdf(BaseEstimator):
                  ordering='pca',
                  min_pca_variance=0.99,
                  min_mutual_information=0,
+                 min_phik_correlation=0,
                  n_nonlinear_vars=None,
                  force_uncorrelated=False,
                  clf=MLPClassifier(random_state=0, max_iter=1000, early_stopping=True),
@@ -75,7 +76,9 @@ class KDECopulaNNPdf(BaseEstimator):
         :param min_pca_variance: minimal pca variance to be explained by non-linear variables. This selects top-n
             non-linear variables that are to be modelled. Used if 'ordering' is 'pca'.
         :param min_mutual_information: minimal mutual information required for selected pairs of variables. This selects
-            top-n non-linear variables that are to be modelled. Used if 'ordering' is 'pca'.
+            top-n non-linear variables that are to be modelled. Used if 'ordering' is 'mi'.
+        :param min_phik_correlation: minimal phik correlation required for selected pairs of variables. This selects
+            top-n non-linear variables that are to be modelled. Used if 'ordering' is 'phik'.
         :param n_nonlinear_vars: number of non-linear variables that are to be modelled. This overrides 'ordering'.
             Default is None.
         :param force_uncorrelated: if True, force that all variables are treated as uncorrelated. So no PCA is applied
@@ -98,6 +101,7 @@ class KDECopulaNNPdf(BaseEstimator):
         self.ordering = ordering
         self.min_pca_variance = min_pca_variance
         self.min_mutual_information = min_mutual_information
+        self.min_phik_correlation = min_phik_correlation
         self.n_nonlinear_vars = n_nonlinear_vars
         self.force_uncorrelated = force_uncorrelated
         self.copy = copy
@@ -115,12 +119,15 @@ class KDECopulaNNPdf(BaseEstimator):
         if self.min_mutual_information < 0:
             raise ValueError("Invalid value for 'min_mutual_information': %f. Should be greater than zero."
                              % self.min_mutual_information)
+        if self.min_phik_correlation < 0 or self.min_phik_correlation > 1:
+            raise ValueError("Invalid value for 'min_phik_correlation': %f. Should be a float in [0,1]."
+                             % self.min_phik_correlation)
         if self.n_nonlinear_vars is not None:
             if not isinstance(self.n_nonlinear_vars, (int, float, np.number)) or self.n_nonlinear_vars < 1:
                 raise ValueError("Invalid value for 'n_nonlinear_vars': %d. Should be an int greater than zero."
                                  % self.n_nonlinear_vars)
-        if self.ordering not in ['pca', 'mi']:
-            raise ValueError("Non-linear variables should be ordered by 'pca' or mutual information 'mi'.")
+        if self.ordering not in ['pca', 'mi', 'phik']:
+            raise ValueError("Non-linear variables should be ordered by 'pca', mutual information 'mi', or 'phik'.")
 
     def fit(self, X, y=None):
         """Fit the Kernel Density Copula NN model on the data.
@@ -241,8 +248,8 @@ class KDECopulaNNPdf(BaseEstimator):
         # will also be higher. This may not always be right, but I think generally it is a safe one.
         iso_reg = IsotonicRegression().fit(bin_centers, p1cb)
         p1pred = iso_reg.predict(bin_centers)
-
-        self.p1f_ = interpolate.interp1d(bin_centers, p1pred, kind='linear', bounds_error=False, fill_value=(0, 1))
+        self.p1f_ = interpolate.interp1d(bin_edges[:-1], p1pred, kind='previous', bounds_error=False,
+                                         fill_value="extrapolate")
 
     def _scale(self, X):
         """ Determine density of the Copula space for input data points
@@ -272,8 +279,13 @@ class KDECopulaNNPdf(BaseEstimator):
             corresponds to a single data point.
         """
         # determine number of variables and bins to use for KBinsDiscretizer.
-        self.nonlinear_indices_, self.residual_indices_ = self._configure_vars_pca(X_uniform) \
-            if self.ordering == "pca" else self._configure_vars_mi(X_uniform)
+        if self.ordering == "pca":
+            self.nonlinear_indices_, self.residual_indices_ = self._configure_vars_pca(X_uniform)
+        elif self.ordering == "mi":
+            self.nonlinear_indices_, self.residual_indices_ = self._configure_vars_mi(X_uniform)
+        elif self.ordering == "phik":
+            self.nonlinear_indices_, self.residual_indices_ = self._configure_vars_phik(X_uniform)
+
         self.n_vars_ = len(self.nonlinear_indices_)
         self.n_resid_vars_ = len(self.residual_indices_)
 
@@ -372,7 +384,75 @@ class KDECopulaNNPdf(BaseEstimator):
 
         # now sort from high to low MI values
         # then extract variable indices associated with highest->lowest MI values
-        indices = indices[arr1inds[::-1]]
+        indices = indices[::-1]
+        nonlinear_indices = []
+        for ij in indices:
+            for j in ij:
+                if j not in nonlinear_indices:
+                    nonlinear_indices.append(j)
+
+        # truncate number of variables if so desired
+        if self.n_nonlinear_vars is not None:
+            nonlinear_indices = nonlinear_indices[:self.n_nonlinear_vars]
+
+        # all remaining indices are considered residual indices;
+        # needed for sampling later on to simulate complete dataset
+        all_indices = set(range(n_features))
+        residual_indices = sorted(all_indices.difference(nonlinear_indices))
+
+        return nonlinear_indices, residual_indices
+
+    def _configure_vars_phik(self, X_uniform):
+        """ Determine the variables to be modelled non-linearly based on phik correlation
+
+        :param X_uniform: array_like, shape (n_samples, n_features)
+            List of n_features-dimensional data points.  Each row
+            corresponds to a single data point.
+        :return: tuple of selected indices of non-linear variables and residual variables
+        """
+        import pandas as pd
+        import phik
+
+        n_features = X_uniform.shape[1]
+
+        # obvious cases
+        if self.force_uncorrelated:
+            nonlinear_indices = []
+            residual_indices = list(range(n_features))
+            return nonlinear_indices, residual_indices
+        if n_features == 1:
+            nonlinear_indices = []
+            residual_indices = [0]
+            return nonlinear_indices, residual_indices
+
+        # use phik to capture residual levels of non-linearity
+        df = pd.DataFrame(X_uniform)
+        phik = df.phik_matrix().values
+
+        # select all off-diagonal mutual information values and index pairs
+        phiks = []
+        indices = []
+        for i, j in itertools.combinations(range(n_features), 2):
+            if phik[i, j] > self.min_phik_correlation or self.n_nonlinear_vars is not None:
+                phiks.append(phik[i, j])
+                indices.append((i, j))
+        phiks = np.array(phiks)
+        indices = np.array(indices)
+
+        # sort those from low to high phik values
+        arr1inds = phiks.argsort()
+        indices = indices[arr1inds]
+        # then sort indices (i,j) on if they also occur in next-max phik value.
+        # e.g. if j occurs in next-max phik values: (i,j) -> (j,i)
+        for i in range(len(indices) - 1):
+            for j in indices[i]:
+                if j in indices[i + 1]:
+                    indices[i + 1] = (indices[i + 1][0], indices[i + 1][1]) if j == indices[i + 1][0] \
+                        else (indices[i + 1][1], indices[i + 1][0])
+
+        # now sort from high to low phik values
+        # then extract variable indices associated with highest->lowest phik values
+        indices = indices[::-1]
         nonlinear_indices = []
         for ij in indices:
             for j in ij:
@@ -523,7 +603,7 @@ class KDECopulaNNPdf(BaseEstimator):
             data = np.concatenate([data, resid], axis=1) if data is not None else resid
 
         # reorder non-linear and residual columns to original order
-        if self.ordering == 'mi':
+        if self.ordering in ['mi', 'phik']:
             current_order = self.nonlinear_indices_ + self.residual_indices_
             permutation = [current_order.index(i) for i in range(len(current_order))]
             reidx = np.empty_like(permutation)

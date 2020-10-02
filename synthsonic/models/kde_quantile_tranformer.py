@@ -358,6 +358,10 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         """
         X = check_array(X, copy=self.copy, dtype=FLOAT_DTYPES, force_all_finite="allow-nan")
 
+        # smoothing of peaks
+        if self.smooth_peaks:
+            X = self._smooth_peaks(X)
+
         jac = 1.0
 
         for idx in range(X.shape[1]):
