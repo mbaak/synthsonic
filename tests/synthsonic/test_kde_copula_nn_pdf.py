@@ -2,17 +2,24 @@ import numpy as np
 import pandas as pd
 from synthsonic.models.kde_copula_nn_pdf import KDECopulaNNPdf
 from scipy.stats import multivariate_normal
+import pytest
 
+@pytest.fixture()
+def dir_root(pytestconfig):
+    return pytestconfig.rootdir
 
-def get_data():
+@pytest.fixture()
+def data(dir_root):
     # example dataset with correlations
-    df = pd.read_csv('correlated_data.sv', sep=' ')
+    correlated_data_path = dir_root / 'notebooks'/'001-mb-kdecopulannpdf-examples'/'correlated_data.sv'
+    df = pd.read_csv(correlated_data_path, sep=' ')
     df.drop(labels=['Unnamed: 5'], inplace=True, axis=1)
     data = df.values
     return data
 
 
-def get_normal_data():
+@pytest.fixture()
+def normal_data():
     # generate bivariate gaussian with correlation
     mux = 0
     muy = 0
@@ -33,8 +40,7 @@ def get_normal_data():
     return X2, p2
 
 
-def test_fit_transformations():
-    data = get_data()
+def test_fit_transformations(data):
 
     # ranges for pdf normalization
     # none means set autimatically.
@@ -114,8 +120,8 @@ def test_fit_transformations():
     np.testing.assert_array_equal(len(X_gen), 124800)
 
 
-def test_pdf_values():
-    X2, p2 = get_normal_data()
+def test_pdf_values(normal_data):
+    X2, p2 = normal_data
     pdf = KDECopulaNNPdf(rho=0.4).fit(X2)
 
     # test nll sum
