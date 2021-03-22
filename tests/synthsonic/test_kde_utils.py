@@ -1,6 +1,6 @@
 import numpy as np
 from numpy import random
-from kde_utils import kde_process_data, kde_pdf, kde_bw, kde_make_transformers, kde_smooth_peaks_1dim
+from synthsonic.models.kde_utils import kde_process_data, kde_pdf, kde_bw, kde_make_transformers, kde_smooth_peaks_1dim
 
 
 def get_data():
