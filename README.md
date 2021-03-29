@@ -3,6 +3,12 @@ synthsonic
 
 Super realistic data modelling and synthesis
 
+## Installation
+
+Users can install with `pip install .`.
+Developers should install with `pip install -e '.[dev,test]'`.
+
+
 Project Organization
 ------------
 
