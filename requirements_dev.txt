@@ -1,2 +1,3 @@
-sdgym
+sdgym==0.3.0
 pandas_profiling
+xgboost==1.3.3
