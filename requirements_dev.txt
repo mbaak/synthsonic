@@ -1,1 +1,1 @@
-sdgym
+git+https://github.com/sbrugman/SDGym.git@v0.2.2-hw
