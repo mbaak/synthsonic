@@ -1,3 +1,3 @@
-sdgym==0.2.2
+git+https://github.com/sbrugman/SDGym.git@v0.2.2-hw
 xgboost==1.3.3
 pandas_profiling
