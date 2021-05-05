@@ -1,11 +1,11 @@
 import pandas as pd
 import numpy as np
-from kde_quantile_tranformer import KDEQuantileTransformer
+from synthsonic.models.kde_quantile_tranformer import KDEQuantileTransformer
 
 
 def get_data():
     # example dataset with correlations and 5 variables
-    df = pd.read_csv('correlated_data.sv', sep=' ')
+    df = pd.read_csv('notebooks/001-mb-kdecopulannpdf-examples/correlated_data.sv', sep=' ')
     df.drop(labels=['Unnamed: 5'], inplace=True, axis=1)
     data = df.values
     return data
