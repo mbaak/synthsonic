@@ -1,4 +1,5 @@
 import numpy as np
+import logging
 from synthsonic.models.kde_quantile_tranformer import KDEQuantileTransformer
 from sklearn.base import BaseEstimator
 from sklearn.utils import check_array
@@ -11,7 +12,8 @@ from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import train_test_split
 from sklearn.isotonic import IsotonicRegression
 import itertools
-import warnings
+
+import matplotlib.pyplot as plt
 from scipy import interpolate
 
 from random import choices
@@ -111,21 +113,18 @@ class KDECopulaNNPdf(BaseEstimator):
         self.min_pdf_value = 1e-20
         self.max_scale_value = 500
         self.clf = clf
+        self.logger = logging.getLogger(self.__class__.__name__)
 
         # basic checks on attributes
         if self.min_pca_variance < 0 or self.min_pca_variance > 1:
-            raise ValueError("Invalid value for 'min_pca_variance': %f. Should be a float in (0,1]."
-                             % self.min_pca_variance)
+            raise ValueError("Invalid value for 'min_pca_variance': %f. Should be a float in (0,1]." % self.min_pca_variance)
         if self.min_mutual_information < 0:
-            raise ValueError("Invalid value for 'min_mutual_information': %f. Should be greater than zero."
-                             % self.min_mutual_information)
+            raise ValueError("Invalid value for 'min_mutual_information': %f. Should be greater than zero." % self.min_mutual_information)
         if self.min_phik_correlation < 0 or self.min_phik_correlation > 1:
-            raise ValueError("Invalid value for 'min_phik_correlation': %f. Should be a float in [0,1]."
-                             % self.min_phik_correlation)
+            raise ValueError("Invalid value for 'min_phik_correlation': %f. Should be a float in [0,1]." % self.min_phik_correlation)
         if self.n_nonlinear_vars is not None:
             if not isinstance(self.n_nonlinear_vars, (int, float, np.number)) or self.n_nonlinear_vars < 1:
-                raise ValueError("Invalid value for 'n_nonlinear_vars': %d. Should be an int greater than zero."
-                                 % self.n_nonlinear_vars)
+                raise ValueError("Invalid value for 'n_nonlinear_vars': %d. Should be an int greater than zero." % self.n_nonlinear_vars)
         if self.ordering not in ['pca', 'mi', 'phik']:
             raise ValueError("Non-linear variables should be ordered by 'pca', mutual information 'mi', or 'phik'.")
 
@@ -148,46 +147,64 @@ class KDECopulaNNPdf(BaseEstimator):
         n_samples, n_features = X.shape
 
         if self.n_quantiles > n_samples:
-            warnings.warn("n_quantiles (%s) is greater than the total number of samples (%s). "
-                          "n_quantiles is set to num samples." % (self.n_quantiles, n_samples))
+            self.logger.warning("n_quantiles (%s) is greater than the total number of samples (%s). n_quantiles is set to num samples." % (self.n_quantiles, n_samples))
         self.n_quantiles = max(1, min(self.n_quantiles, n_samples))
         if self.n_nonlinear_vars is not None:
             if self.n_nonlinear_vars > n_features:
-                warnings.warn("n_nonlinear_vars (%d) is greater than the total number of features (%d). "
-                              "n_nonlinear_vars is set to num features." % (self.n_nonlinear_vars, n_features))
-            self.n_nonlinear_vars = min(self.n_nonlinear_vars, n_features)
+                self.logger.warning("n_nonlinear_vars (%d) is greater than the total number of features (%d). n_nonlinear_vars is set to num features." % (self.n_nonlinear_vars, n_features))
+                self.n_nonlinear_vars = min(self.n_nonlinear_vars, n_features)
         if not self.do_PCA and self.ordering == 'pca':
-            warnings.warn("Cannot order non-linear variables by pca (turned off). Switching to mutual information.")
+            self.logger.warning("Cannot order non-linear variables by pca (turned off). Switching to mutual information.")
             self.ordering = 'mi'
 
         if self.do_PCA and n_features > 1 and not self.force_uncorrelated:
-            self.pipe_ = make_pipeline(KDEQuantileTransformer(n_quantiles=self.n_quantiles,
-                                                              output_distribution='normal',
-                                                              mirror_left=self.mirror_left,
-                                                              mirror_right=self.mirror_right, rho=self.rho,
-                                                              n_adaptive=self.n_adaptive, x_min=self.x_min,
-                                                              x_max=self.x_max, copy=self.copy,
-                                                              random_state=self.random_state,
-                                                              use_inverse_qt=self.use_inverse_qt,
-                                                              use_KDE=self.use_KDE),
-                                       PCA(n_components=n_features, whiten=False, copy=self.copy),
-                                       KDEQuantileTransformer(n_quantiles=self.n_quantiles,
-                                                              output_distribution='uniform', rho=min(self.rho, 0.2),
-                                                              n_adaptive=self.n_adaptive, use_inverse_qt=True,
-                                                              copy=self.copy, random_state=self.random_state)
-                                       )
+            self.pipe_ = make_pipeline(
+                KDEQuantileTransformer(
+                    n_quantiles=self.n_quantiles,
+                    output_distribution='normal',
+                    mirror_left=self.mirror_left,
+                    mirror_right=self.mirror_right,
+                    rho=self.rho,
+                    n_adaptive=self.n_adaptive,
+                    x_min=self.x_min,
+                    x_max=self.x_max,
+                    copy=self.copy,
+                    random_state=self.random_state,
+                    use_inverse_qt=self.use_inverse_qt,
+                    use_KDE=self.use_KDE
+                ),
+               PCA(n_components=n_features, whiten=False, copy=self.copy),
+               KDEQuantileTransformer(
+                    n_quantiles=self.n_quantiles,
+                    output_distribution='uniform',
+                    rho=min(self.rho, 0.2),
+                    n_adaptive=self.n_adaptive,
+                    use_inverse_qt=True,
+                    copy=self.copy,
+                    random_state=self.random_state
+               )
+            )
         else:
-            self.pipe_ = make_pipeline(KDEQuantileTransformer(n_quantiles=self.n_quantiles,
-                                                              output_distribution='uniform',
-                                                              mirror_left=self.mirror_left,
-                                                              mirror_right=self.mirror_right, rho=self.rho,
-                                                              n_adaptive=self.n_adaptive, x_min=self.x_min,
-                                                              x_max=self.x_max, copy=self.copy,
-                                                              random_state=self.random_state,
-                                                              use_inverse_qt=self.use_inverse_qt,
-                                                              use_KDE=self.use_KDE))
-        print(f'Transforming variables.')
+            self.pipe_ = make_pipeline(
+                KDEQuantileTransformer(
+                    n_quantiles=self.n_quantiles,
+                    output_distribution='uniform',
+                    mirror_left=self.mirror_left,
+                    mirror_right=self.mirror_right,
+                    rho=self.rho,
+                    n_adaptive=self.n_adaptive,
+                    x_min=self.x_min,
+                    x_max=self.x_max,
+                    copy=self.copy,
+                    random_state=self.random_state,
+                    use_inverse_qt=self.use_inverse_qt,
+                    use_KDE=self.use_KDE
+                )
+            )
+
+        self.logger.info(f'Transforming variables.')
         X_uniform = self.pipe_.fit_transform(X)
+
         # determine number of features to use for nonlinear modelling
         self._configure_nonlinear_variables(X_uniform)
 
@@ -195,30 +212,30 @@ class KDECopulaNNPdf(BaseEstimator):
             # note: residual vars are treated as uncorrelated
             X_slice = X_uniform[:, self.nonlinear_indices_]
             # this function captures in matrices the residual non-linearity after the transformations above.
-            print(f'Fitting and calibrating classifier.')
+            self.logger.info(f'Fitting and calibrating classifier.')
             self._configure_classifier(X_slice)
 
-        print(f'Model = rho: {self.rho}, number of selected non-linear variables: {self.n_vars_}')
+        self.logger.info(f'Model = rho: {self.rho}, number of selected non-linear variables: {self.n_vars_}')
 
         return self
 
-    def _configure_classifier(self, X1, test_size=0.35):
+    def _configure_classifier(self, X1, test_size=0.35, bins = 100, validation_plots=True):
         """ The neural network below captures the residual non-linearity after the transformations above.
 
         :param X1: array_like, shape (n_samples, n_features)
             List of n_features-dimensional data points to be modelled.  Each row
             corresponds to a single data point.
-        :param float test_size: fraction of X1 used for probability calibration. Default is 0.4.
+        :param float test_size: fraction of X1 used for probability calibration. Default is 0.35.
         """
         # fitting uniform data sample vs observed data
-
         # set random state
         np.random.seed(self.random_state)
 
         # make training sample and labels
         # use test sample below for probability calibration.
-        X1_train, X1_test, y1_train, y1_test = train_test_split(X1, np.ones(X1.shape[0]), test_size=test_size,
-                                                                random_state=self.random_state)
+        X1_train, X1_test, y1_train, y1_test = train_test_split(
+            X1, np.ones(X1.shape[0]), test_size=test_size, random_state=self.random_state
+        )
         X0_train = np.random.uniform(size=X1_train.shape)
         X_train = np.concatenate([X0_train, X1_train], axis=0)
         y_train = np.concatenate([np.zeros(X1_train.shape[0]), y1_train], axis=None)
@@ -232,12 +249,19 @@ class KDECopulaNNPdf(BaseEstimator):
         p0 = self.clf.predict_proba(X0_test)[:, 1]
         p1 = self.clf.predict_proba(X1_test)[:, 1]
 
-        hist_p0, bin_edges = np.histogram(p0, bins=100, range=(0, 1))
-        hist_p1, bin_edges = np.histogram(p1, bins=100, range=(0, 1))
-        bin_centers = bin_edges[:-1] + 0.005
+        if validation_plots:
+            plt.figure(figsize=(12, 7))
+            plt.hist(p0, bins=bins, range=(0, 1), alpha=0.5, density=True, label='p0')
+            plt.hist(p1, bins=bins, range=(0, 1), alpha=0.5, density=True, label='p1')
+            plt.legend()
+            plt.show()
 
-        hnorm_p0 = hist_p0 / sum(hist_p0)
-        hnorm_p1 = hist_p1 / sum(hist_p1)
+        hist_p0, bin_edges = np.histogram(p0, bins=bins, range=(0, 1))
+        hist_p1, bin_edges = np.histogram(p1, bins=bins, range=(0, 1))
+        bin_centers = bin_edges[:-1] + 0.5 / bins
+
+        hnorm_p0 = hist_p0 / np.sum(hist_p0)
+        hnorm_p1 = hist_p1 / np.sum(hist_p1)
         hnorm_sum = hnorm_p0 + hnorm_p1
         p1cb = np.divide(hnorm_p1, hnorm_sum, out=np.zeros_like(hnorm_p1), where=hnorm_sum != 0)
         # self.p1cb = p1cb, bin_centers
@@ -246,10 +270,23 @@ class KDECopulaNNPdf(BaseEstimator):
         # isotonic regression assumes that p1 can only be a rising function.
         # I’m assuming that if a classifier predicts a higher probability, the calibrated probability
         # will also be higher. This may not always be right, but I think generally it is a safe one.
-        iso_reg = IsotonicRegression().fit(bin_centers, p1cb)
+        iso_reg = IsotonicRegression(y_min=0, y_max=1).fit(bin_centers, p1cb)
         p1pred = iso_reg.predict(bin_centers)
-        self.p1f_ = interpolate.interp1d(bin_edges[:-1], p1pred, kind='previous', bounds_error=False,
-                                         fill_value="extrapolate")
+        self.p1f_ = interpolate.interp1d(
+            bin_edges[:-1],
+            p1pred,
+            kind='previous',
+            bounds_error=False,
+            fill_value="extrapolate"
+        )
+
+        if validation_plots:
+            plt.figure(figsize=(12, 7))
+            plt.plot(bin_centers, p1cb, label='p1cb')
+            plt.plot(bin_centers, p1pred, label='p1pred')
+            plt.plot(bin_centers, bin_centers, label='bin_centers')
+            plt.legend()
+            plt.show()
 
     def _scale(self, X):
         """ Determine density of the Copula space for input data points
@@ -634,8 +671,8 @@ class KDECopulaNNPdf(BaseEstimator):
         """
         
         if mode=='expensive': #all samples are unique
-            
-            #estimate the acceptance ratio to estimate n_tries required to get 
+
+            #estimate the acceptance ratio to estimate n_tries required to get
             #   desired sample size
             tempdata, tempsample_weights = self._sample_no_transform(1000, random_state)
             # apply accept-reject method
