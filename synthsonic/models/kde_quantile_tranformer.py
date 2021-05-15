@@ -215,8 +215,9 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
             x = X[:, i]
             qs = np.quantile(x, ps)
             bin_entries, bin_edges = np.histogram(x, bins=qs)
+            bin_entries = bin_entries.astype(float) / n_samples
             bin_diffs = np.diff(bin_edges)
-            pdf_norm = bin_entries / n_samples / bin_diffs
+            pdf_norm = np.divide(bin_entries, bin_diffs, out=np.zeros_like(bin_entries), where=bin_diffs != 0)
             fast_pdf = interpolate.interp1d(bin_edges[:-1], pdf_norm, kind='previous', bounds_error=False,
                                             fill_value=(min_pdf_value, min_pdf_value))
             self.pdf_.append({'fast': fast_pdf})
@@ -268,7 +269,7 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
             # smooth peaks - note: this adds a random component to the data
             # applying smoothing to data that's already been smoothed has no impact, b/c all peaks are already gone.
             x = kde_smooth_peaks_1dim(x, self.mirror_left[feature_idx], self.mirror_right[feature_idx],
-                                      copy=False, random_state=self.random_state)
+                                      copy=False, random_state=self.random_state, smoothing_width=1e-5)
             X[:, feature_idx] = x
         return X
 
