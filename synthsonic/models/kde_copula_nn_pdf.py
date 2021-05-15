@@ -311,7 +311,7 @@ class KDECopulaNNPdf(BaseEstimator):
 
         if X_bn is None:
             # generate sample
-            df = self.bn_sampler.forward_sample(size=size, return_type='dataframe', show_progress=show_progress)
+            df = self.bn_sampler.forward_sample(size=size, show_progress=show_progress)
             # "tan" bayesian network needs string column names; here convert back to ints
             df.columns = [int(c) for c in df.columns]
             X_bn = df[sorted(df.columns)].values
@@ -344,7 +344,7 @@ class KDECopulaNNPdf(BaseEstimator):
             self._fit_classifier(X1=X_trans[:, self.nonlinear_indices_], X0_test=X_bn[:, self.nonlinear_indices_],
                                  bins=self.n_calibration_bins)
 
-    def _fit_classifier(self, X1, bins=100, validation_plots=False, X0_test=None):
+    def _fit_classifier(self, X1, bins=100, X0_test=None):
         """ The neural network below captures the residual non-linearity after the transformations above.
 
         :param X1: array_like, shape (n_samples, n_features)
@@ -381,17 +381,10 @@ class KDECopulaNNPdf(BaseEstimator):
         p0 = self.clf.predict_proba(X0_test)[:, 1]
         p1 = self.clf.predict_proba(X1_test)[:, 1]
 
-        if validation_plots:
-            plt.figure(figsize=(12, 7))
-            plt.hist(p0, bins=bins, range=(0, 1), alpha=0.5, density=True, label='p0')
-            plt.hist(p1, bins=bins, range=(0, 1), alpha=0.5, density=True, label='p1')
-            plt.legend()
-            plt.show()
-
         # next: evaluation of calibration and sample weights
         hist_p0, bin_edges = np.histogram(p0, bins=bins, range=(0, 1))
         hist_p1, bin_edges = np.histogram(p1, bins=bins, range=(0, 1))
-        self._calibrate_classifier(hist_p0, hist_p1, bin_edges, validation_plots=validation_plots)
+        self._calibrate_classifier(hist_p0, hist_p1, bin_edges)
 
         # storing these for validation later on
         self.hist_p0_ = hist_p0
@@ -412,6 +405,14 @@ class KDECopulaNNPdf(BaseEstimator):
         rest_p0 = np.sum(hist_p0) - hist_p0
         rest_p1 = np.sum(hist_p1) - hist_p1
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.
+        bin_width = bin_edges[1] - bin_edges[0]
+
+        if validation_plots:
+            plt.figure(figsize=(12, 7))
+            plt.bar(bin_centers, hist_p0 / np.sum(hist_p0), width=bin_width, alpha=0.5, label='p0')
+            plt.bar(bin_centers, hist_p1 / np.sum(hist_p1), width=bin_width, alpha=0.5, label='p1')
+            plt.legend()
+            plt.show()
 
         def poisson_uncertainty(n):
             # return correct poisson counts (set to one for zero counts)
