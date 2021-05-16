@@ -68,6 +68,7 @@ class KDECopulaNNPdf(BaseEstimator):
                  use_KDE=True,
                  n_uniform_bins=25,
                  n_calibration_bins=100,
+                 test_size=0.35,
                  copy=True,
                  clffitkw={}):
         """Parameters of the KDECopulaNNPdf class
@@ -138,7 +139,7 @@ class KDECopulaNNPdf(BaseEstimator):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.n_uniform_bins = n_uniform_bins
         self.n_calibration_bins = n_calibration_bins
-        self.test_size = 0.35
+        self.test_size = test_size
         self.clffitkw = clffitkw
 
         # basic checks on attributes
