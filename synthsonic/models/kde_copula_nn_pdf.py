@@ -274,7 +274,7 @@ class KDECopulaNNPdf(BaseEstimator):
         # "tan" bayesian network needs string column names
         df.columns = [str(c) for c in df.columns]
         est = TreeSearch(df, root_node=df.columns[0])
-        dag = est.estimate(estimator_type="tan", class_node='1', show_progress=False,
+        dag = est.estimate(estimator_type="tan", class_node='1', show_progress=True,
                            edge_weights_fn=self.edge_weights_fn)
         # model the conditional probabilities
         self.bn = BayesianModel(dag.edges())
@@ -335,7 +335,8 @@ class KDECopulaNNPdf(BaseEstimator):
         :param X_trans: observed data with discrete uniform numerical variables
         """
         # determine number of features to use for nonlinear modelling
-        X_bn = self._sample_bayesian_network(size=max(250000, X_discrete.shape[0]), add_uniform=False)
+        n_sample = int(X_discrete.shape[0] * (1. - self.test_size)) + max(250000, X_discrete.shape[0])
+        X_bn = self._sample_bayesian_network(size=n_sample, add_uniform=False)
         self._configure_nonlinear_variables(X_discrete=X_discrete, X_expect=X_bn)
 
         # fit the classifier with selected non-linear variables (default is all)
@@ -345,10 +346,10 @@ class KDECopulaNNPdf(BaseEstimator):
             X_bn = self._sample_bayesian_network(X_bn=X_bn, add_uniform=True, show_progress=False)
             # this function captures in matrices the residual non-linearity after the transformations above.
             # note: residual vars are not used in classifier
-            self._fit_classifier(X1=X_trans[:, self.nonlinear_indices_], X0_test=X_bn[:, self.nonlinear_indices_],
+            self._fit_classifier(X1=X_trans[:, self.nonlinear_indices_], X0=X_bn[:, self.nonlinear_indices_],
                                  bins=self.n_calibration_bins)
 
-    def _fit_classifier(self, X1, bins=100, X0_test=None):
+    def _fit_classifier(self, X1, bins=100, X0=None):
         """ The neural network below captures the residual non-linearity after the transformations above.
 
         :param X1: array_like, shape (n_samples, n_features)
@@ -365,8 +366,9 @@ class KDECopulaNNPdf(BaseEstimator):
         X1_train, X1_test, y1_train, y1_test = train_test_split(
             X1, np.ones(X1.shape[0]), test_size=self.test_size, random_state=self.random_state
         )
-        X0_train = self._sample_bayesian_network(size=X1_train.shape[0],
-                                                 show_progress=False)[:, self.nonlinear_indices_]
+        X0_train = X0[:X1_train.shape[0]] if X0 is not None else \
+            self._sample_bayesian_network(size=X1_train.shape[0],
+                                          show_progress=False)[:, self.nonlinear_indices_]
 
         X_train = np.concatenate([X0_train, X1_train], axis=0)
         y_train = np.concatenate([np.zeros(X1_train.shape[0]), y1_train], axis=None)
@@ -378,7 +380,7 @@ class KDECopulaNNPdf(BaseEstimator):
         # Calibrate probabilities manually. (Used for weights calculation.)
         self.logger.info(f'Calibrating classifier.')
 
-        X0_test = X0_test if X0_test is not None else \
+        X0_test = X0[X1_train.shape[0]:] if X0 is not None else \
             self._sample_bayesian_network(size=max(250000, X1_test.shape[0]),
                                           show_progress=True)[:, self.nonlinear_indices_]
 
@@ -413,8 +415,8 @@ class KDECopulaNNPdf(BaseEstimator):
 
         if validation_plots:
             plt.figure(figsize=(12, 7))
-            plt.bar(bin_centers, hist_p0 / np.sum(hist_p0), width=bin_width, alpha=0.5, label='p0')
-            plt.bar(bin_centers, hist_p1 / np.sum(hist_p1), width=bin_width, alpha=0.5, label='p1')
+            plt.bar(bin_centers, hist_p0 / np.sum(hist_p0), width=bin_width, alpha=0.5, label='p0', log=True)
+            plt.bar(bin_centers, hist_p1 / np.sum(hist_p1), width=bin_width, alpha=0.5, label='p1', log=True)
             plt.legend()
             plt.show()
 
@@ -842,8 +844,10 @@ class KDECopulaNNPdf(BaseEstimator):
             List of samples, sample weights
         """
         X, sample_weights = self._sample_no_transform(n_samples, random_state, show_progress=show_progress)
+        n_features = len(self.numerical_columns)
         X_cat = X[:, self.categorical_columns]
-        X_num = self.pipe_.inverse_transform(X[:, self.numerical_columns])
+        X_num = X[:, self.numerical_columns]
+        X_num = self.pipe_.inverse_transform(X_num) if n_features > 0 else X_num
         return self._join_and_reorder(X_cat, X_num, self.categorical_columns, self.numerical_columns), sample_weights
 
     def _sample_no_transform(self, n_samples=1, random_state=None, show_progress=False):
