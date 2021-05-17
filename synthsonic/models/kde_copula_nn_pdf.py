@@ -70,7 +70,8 @@ class KDECopulaNNPdf(BaseEstimator):
                  n_calibration_bins=100,
                  test_size=0.35,
                  copy=True,
-                 clffitkw={}):
+                 clffitkw={},
+                 edge_weights_fn="mutual_info"):
         """Parameters of the KDECopulaNNPdf class
 
         KDECopulaNNPdf applies 7 steps to model any data distribution, where the variables are continuous:
@@ -141,6 +142,7 @@ class KDECopulaNNPdf(BaseEstimator):
         self.n_calibration_bins = n_calibration_bins
         self.test_size = test_size
         self.clffitkw = clffitkw
+        self.edge_weights_fn = edge_weights_fn
 
         # basic checks on attributes
         if self.min_pca_variance < 0 or self.min_pca_variance > 1:
@@ -272,7 +274,8 @@ class KDECopulaNNPdf(BaseEstimator):
         # "tan" bayesian network needs string column names
         df.columns = [str(c) for c in df.columns]
         est = TreeSearch(df, root_node=df.columns[0])
-        dag = est.estimate(estimator_type="tan", class_node='1', show_progress=False)
+        dag = est.estimate(estimator_type="tan", class_node='1', show_progress=False,
+                           edge_weights_fn=self.edge_weights_fn)
         # model the conditional probabilities
         self.bn = BayesianModel(dag.edges())
         self.bn.fit(df)
@@ -936,6 +939,8 @@ class KDECopulaNNPdf(BaseEstimator):
             return data
 
         # transform back all numerical columns
+        n_features = len(self.numerical_columns)
         X_cat = data[:, self.categorical_columns]
-        X_num = self.pipe_.inverse_transform(data[:, self.numerical_columns])
+        X_num = data[:, self.numerical_columns]
+        X_num = self.pipe_.inverse_transform(X_num) if n_features > 0 else X_num
         return self._join_and_reorder(X_cat, X_num, self.categorical_columns, self.numerical_columns)
