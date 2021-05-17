@@ -16,6 +16,11 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import train_test_split
 from sklearn.isotonic import IsotonicRegression
+from sklearn.metrics import (
+    mutual_info_score,
+    adjusted_mutual_info_score,
+    normalized_mutual_info_score,
+)
 
 from xgboost import XGBClassifier
 
@@ -272,7 +277,8 @@ class KDECopulaNNPdf(BaseEstimator):
         # "tan" bayesian network needs string column names
         df.columns = [str(c) for c in df.columns]
         est = TreeSearch(df, root_node=df.columns[0])
-        dag = est.estimate(estimator_type="tan", class_node='1', show_progress=False)
+        dag = est.estimate(estimator_type="tan", class_node='1', show_progress=False,
+                           edge_weights_fn=normalized_mutual_info_score)
         # model the conditional probabilities
         self.bn = BayesianModel(dag.edges())
         self.bn.fit(df)
