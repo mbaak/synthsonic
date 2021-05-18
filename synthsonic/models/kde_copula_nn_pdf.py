@@ -71,6 +71,7 @@ class KDECopulaNNPdf(BaseEstimator):
                  test_size=0.35,
                  copy=True,
                  clffitkw={},
+                 estimator_type="tan",
                  edge_weights_fn="mutual_info",
                  class_node=1):
         """Parameters of the KDECopulaNNPdf class
@@ -143,6 +144,7 @@ class KDECopulaNNPdf(BaseEstimator):
         self.n_calibration_bins = n_calibration_bins
         self.test_size = test_size
         self.clffitkw = clffitkw
+        self.estimator_type = estimator_type
         self.edge_weights_fn = edge_weights_fn
         self.class_node = class_node
 
@@ -276,7 +278,7 @@ class KDECopulaNNPdf(BaseEstimator):
         # "tan" bayesian network needs string column names
         df.columns = [str(c) for c in df.columns]
         est = TreeSearch(df, root_node=df.columns[0])
-        dag = est.estimate(estimator_type="tan", class_node=str(self.class_node), show_progress=True,
+        dag = est.estimate(estimator_type=self.estimator_type, class_node=str(self.class_node), show_progress=True,
                            edge_weights_fn=self.edge_weights_fn)
         # model the conditional probabilities
         self.bn = BayesianModel(dag.edges())
@@ -321,7 +323,7 @@ class KDECopulaNNPdf(BaseEstimator):
             # "tan" bayesian network needs string column names; here convert back to ints
             df.columns = [int(c) for c in df.columns]
             X_bn = df[sorted(df.columns)].values
-        if X_bn is not None and add_uniform:
+        if X_bn is not None and add_uniform and len(self.numerical_columns) > 0:
             # turn discrete numerical columns back to uniform
             bin_width = 1. / self.n_uniform_bins
             X_rand = np.random.uniform(low=0., high=bin_width, size=(X_bn.shape[0], len(self.numerical_columns)))
