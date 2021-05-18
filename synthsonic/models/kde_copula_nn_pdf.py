@@ -71,7 +71,8 @@ class KDECopulaNNPdf(BaseEstimator):
                  test_size=0.35,
                  copy=True,
                  clffitkw={},
-                 edge_weights_fn="mutual_info"):
+                 edge_weights_fn="mutual_info",
+                 class_node=1):
         """Parameters of the KDECopulaNNPdf class
 
         KDECopulaNNPdf applies 7 steps to model any data distribution, where the variables are continuous:
@@ -143,6 +144,7 @@ class KDECopulaNNPdf(BaseEstimator):
         self.test_size = test_size
         self.clffitkw = clffitkw
         self.edge_weights_fn = edge_weights_fn
+        self.class_node = class_node
 
         # basic checks on attributes
         if self.min_pca_variance < 0 or self.min_pca_variance > 1:
@@ -274,7 +276,7 @@ class KDECopulaNNPdf(BaseEstimator):
         # "tan" bayesian network needs string column names
         df.columns = [str(c) for c in df.columns]
         est = TreeSearch(df, root_node=df.columns[0])
-        dag = est.estimate(estimator_type="tan", class_node='1', show_progress=True,
+        dag = est.estimate(estimator_type="tan", class_node=str(self.class_node), show_progress=True,
                            edge_weights_fn=self.edge_weights_fn)
         # model the conditional probabilities
         self.bn = BayesianModel(dag.edges())
