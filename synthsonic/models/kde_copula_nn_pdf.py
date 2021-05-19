@@ -513,7 +513,7 @@ class KDECopulaNNPdf(BaseEstimator):
         X_slice  = self._transform_and_slice(X)
         return self.clf.predict_proba(X_slice)
 
-    def _scale(self, X):
+    def _scale(self, X, apply_calibration=True):
         """ Determine density of the Copula space for input data points
 
         :param X: array_like, shape (n_samples, n_features)
@@ -527,7 +527,7 @@ class KDECopulaNNPdf(BaseEstimator):
             return np.ones(n_samples)
 
         prob = self.clf.predict_proba(X)[:, 1]
-        nominator = self.p1f_(prob)
+        nominator = self.p1f_(prob) if apply_calibration else prob
         denominator = 1. - nominator
         # calculate ratio. In case denominator is zero, return 1 as ratio.
         ratio = np.divide(nominator, denominator, out=np.ones_like(nominator), where=denominator != 0)
@@ -834,7 +834,7 @@ class KDECopulaNNPdf(BaseEstimator):
         """
         return np.sum(self.score_samples(X))
 
-    def sample(self, n_samples=1, random_state=None, show_progress=False):
+    def sample(self, n_samples=1, random_state=None, show_progress=False, apply_calibration=True):
         """Generate random samples from the model.
 
         :param n_samples: int, optional
@@ -847,14 +847,15 @@ class KDECopulaNNPdf(BaseEstimator):
         :return: array_like, shape (n_samples, n_features)
             List of samples, sample weights
         """
-        X, sample_weights = self._sample_no_transform(n_samples, random_state, show_progress=show_progress)
+        X, sample_weights = self._sample_no_transform(n_samples, random_state, show_progress=show_progress,
+                                                      apply_calibration=apply_calibration)
         n_features = len(self.numerical_columns)
         X_cat = X[:, self.categorical_columns]
         X_num = X[:, self.numerical_columns]
         X_num = self.pipe_.inverse_transform(X_num) if n_features > 0 else X_num
         return self._join_and_reorder(X_cat, X_num, self.categorical_columns, self.numerical_columns), sample_weights
 
-    def _sample_no_transform(self, n_samples=1, random_state=None, show_progress=False):
+    def _sample_no_transform(self, n_samples=1, random_state=None, show_progress=False, apply_calibration=True):
         """Generate uniform random samples from the model.
 
         No inverse feature transformations are applied.
@@ -879,12 +880,12 @@ class KDECopulaNNPdf(BaseEstimator):
 
         # generate nonlinear variables with accept-reject method
         data = self._sample_bayesian_network(size=n_samples, show_progress=show_progress)
-        sample_weights = self._scale(data[:, self.nonlinear_indices_])
+        sample_weights = self._scale(data[:, self.nonlinear_indices_], apply_calibration=apply_calibration)
 
         return data, sample_weights
 
     def sample_no_weights(self, n_samples=1, random_state=None, mode='expensive', show_progress=False,
-                          inverse_transform=True, cheap_factor=1):
+                          inverse_transform=True, cheap_factor=1, apply_calibration=True):
         """Generate random samples from the model.
 
         Use accept-reject to get rid of sample weights.
@@ -908,8 +909,8 @@ class KDECopulaNNPdf(BaseEstimator):
             # all samples are unique
 
             # estimate the acceptance ratio to estimate n_tries required to get desired sample size
-            tempdata, tempsample_weights = self._sample_no_transform(1000, random_state, show_progress=False)
-
+            tempdata, tempsample_weights = self._sample_no_transform(1000, random_state, show_progress=False,
+                                                                     apply_calibration=apply_calibration)
             # apply accept-reject method
             tempweight_max = np.max(tempsample_weights)
             tempu = np.random.uniform(0, tempweight_max, size=1000)
@@ -920,8 +921,8 @@ class KDECopulaNNPdf(BaseEstimator):
             n_tries = int(np.ceil(1/accratio*n_samples)) + 1000
             
             #n_tries = 10*n_samples
-            data, sample_weights = self._sample_no_transform(n_tries, random_state, show_progress=show_progress)
-            
+            data, sample_weights = self._sample_no_transform(n_tries, random_state, show_progress=show_progress,
+                                                             apply_calibration=apply_calibration)
             # apply accept-reject method
             weight_max = np.max(sample_weights)
             u = np.random.uniform(0, weight_max, size=n_tries)
@@ -934,7 +935,8 @@ class KDECopulaNNPdf(BaseEstimator):
         elif mode == 'cheap':
             # generated samples are dropped or duplicated to match weights
             data, sample_weights = self._sample_no_transform(n_samples * cheap_factor, random_state,
-                                                             show_progress=show_progress)
+                                                             show_progress=show_progress,
+                                                             apply_calibration=apply_calibration)
             pop = np.asarray(range(data.shape[0]))
             probs = sample_weights/np.sum(sample_weights)
             sample = choices(pop, probs, k=n_samples)
