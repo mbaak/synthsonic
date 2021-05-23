@@ -27,7 +27,7 @@ from pgmpy.inference import BayesianModelProbability
 import matplotlib.pyplot as plt
 from scipy import interpolate
 
-from random import choices
+from random import choices, seed
 
 
 class KDECopulaNNPdf(BaseEstimator):
@@ -218,7 +218,12 @@ class KDECopulaNNPdf(BaseEstimator):
                     use_inverse_qt=self.use_inverse_qt,
                     use_KDE=self.use_KDE
                 ),
-                PCA(n_components=n_features, whiten=False, copy=self.copy),
+                PCA(
+                    n_components=n_features, 
+                    whiten=False, 
+                    copy=self.copy,
+                    random_state=self.random_state,
+                ),
                 KDEQuantileTransformer(
                     n_quantiles=self.n_quantiles,
                     output_distribution='uniform',
@@ -319,7 +324,7 @@ class KDECopulaNNPdf(BaseEstimator):
 
         if X_bn is None:
             # generate sample
-            df = self.bn_sampler.forward_sample(size=size, show_progress=show_progress)
+            df = self.bn_sampler.forward_sample(size=size, show_progress=show_progress, seed=seed)
             # "tan" bayesian network needs string column names; here convert back to ints
             df.columns = [int(c) for c in df.columns]
             X_bn = df[sorted(df.columns)].values
@@ -340,14 +345,14 @@ class KDECopulaNNPdf(BaseEstimator):
         """
         # determine number of features to use for nonlinear modelling
         n_sample = int(X_discrete.shape[0] * (1. - self.test_size)) + max(250000, X_discrete.shape[0])
-        X_bn = self._sample_bayesian_network(size=n_sample, add_uniform=False)
+        X_bn = self._sample_bayesian_network(size=n_sample, add_uniform=False, seed=self.random_state)
         self._configure_nonlinear_variables(X_discrete=X_discrete, X_expect=X_bn)
 
         # fit the classifier with selected non-linear variables (default is all)
         if self.n_vars_ >= 2 and not self.force_uncorrelated and self.clf is not None:
             self.logger.info(f'Fitting discriminative learner: selected {len(self.nonlinear_indices_)} features.')
             # reuse X_bn as test sample below, add uniform component here (generation from bn can be slow)
-            X_bn = self._sample_bayesian_network(X_bn=X_bn, add_uniform=True, show_progress=False)
+            X_bn = self._sample_bayesian_network(X_bn=X_bn, add_uniform=True, show_progress=False, seed=self.random_state)
             # this function captures in matrices the residual non-linearity after the transformations above.
             # note: residual vars are not used in classifier
             self._fit_classifier(X1=X_trans[:, self.nonlinear_indices_], X0=X_bn[:, self.nonlinear_indices_],
@@ -372,7 +377,7 @@ class KDECopulaNNPdf(BaseEstimator):
         )
         X0_train = X0[:X1_train.shape[0]] if X0 is not None else \
             self._sample_bayesian_network(size=X1_train.shape[0],
-                                          show_progress=False)[:, self.nonlinear_indices_]
+                                          show_progress=False, seed=self.random_state)[:, self.nonlinear_indices_]
 
         X_train = np.concatenate([X0_train, X1_train], axis=0)
         y_train = np.concatenate([np.zeros(X1_train.shape[0]), y1_train], axis=None)
@@ -624,7 +629,7 @@ class KDECopulaNNPdf(BaseEstimator):
         # use mutual information to capture residual levels of non-linearity
         mi = np.zeros((n_features, n_features))
         for i in range(n_features):
-            mi[i, :] = mutual_info_regression(X_discrete, X_discrete[:, i])
+            mi[i, :] = mutual_info_regression(X_discrete, X_discrete[:, i], random_state=self.random_state)
 
         # select all off-diagonal mutual information values and index pairs
         mis = []
@@ -879,7 +884,7 @@ class KDECopulaNNPdf(BaseEstimator):
             np.random.seed(random_state)
 
         # generate nonlinear variables with accept-reject method
-        data = self._sample_bayesian_network(size=n_samples, show_progress=show_progress)
+        data = self._sample_bayesian_network(size=n_samples, show_progress=show_progress, seed=random_state)
         sample_weights = self._scale(data[:, self.nonlinear_indices_], apply_calibration=apply_calibration)
 
         return data, sample_weights
@@ -905,6 +910,9 @@ class KDECopulaNNPdf(BaseEstimator):
         :return: array_like, shape (n_samples, n_features)
             List of samples.
         """
+        if random_state is not None:
+            seed(random_state)
+            
         if mode == 'expensive':
             # all samples are unique
 
