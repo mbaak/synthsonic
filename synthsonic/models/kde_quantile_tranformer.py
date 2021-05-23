@@ -191,8 +191,12 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         # perform quantile transformation to smooth out any residual imperfections after kde
         # standard quantile transformer helps to smooth out any residual imperfections after kde transformation,
         # and does conversion to normal.
-        self.qt_ = QuantileTransformer(n_quantiles=self.n_quantiles, output_distribution=self.output_distribution,
-                                       copy=self.copy)
+        self.qt_ = QuantileTransformer(
+            n_quantiles=self.n_quantiles, 
+            output_distribution=self.output_distribution,
+            copy=self.copy,
+            random_state=self.random_state,
+        )
         self.qt_.fit(X)
 
         return self
