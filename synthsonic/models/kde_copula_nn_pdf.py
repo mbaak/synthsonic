@@ -471,7 +471,7 @@ class KDECopulaNNPdf(BaseEstimator):
         # isotonic regression assumes that p1 can only be a rising function.
         # (we're assuming that if a classifier predicts a higher probability, the calibrated probability
         # will also be higher. This will generally be a safe assumption.)
-        iso_reg = IsotonicRegression(y_min=0, y_max=1).fit(bin_centers, p1cb, sample_weight)
+        iso_reg = IsotonicRegression(y_min=0, y_max=1, increasing='auto').fit(bin_centers, p1cb, sample_weight)
         # iso_reg = IsotonicRegression(y_min=0, y_max=1).fit(bin_centers, p1cb)
         p1pred = iso_reg.predict(bin_centers)
         self.p1f_ = interpolate.interp1d(
