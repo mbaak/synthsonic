@@ -61,13 +61,13 @@ class KDECopulaNNPdf(BaseEstimator):
                  n_nonlinear_vars=None,
                  force_uncorrelated=False,
                  # clf=MLPClassifier(random_state=0, max_iter=1000, early_stopping=True),
-                 clf = XGBClassifier(n_estimators=250, reg_lambda=1, gamma=0, max_depth=9, use_label_encoder=False,
+                 clf=XGBClassifier(n_estimators=250, reg_lambda=1, gamma=0, max_depth=9, use_label_encoder=False,
                                      eval_metric='logloss'),
                  random_state=0,
                  use_inverse_qt=False,
                  use_KDE=True,
-                 n_uniform_bins=25,
-                 n_calibration_bins=100,
+                 n_uniform_bins='auto',
+                 n_calibration_bins='auto',
                  test_size=0.35,
                  copy=True,
                  clffitkw={},
@@ -219,8 +219,8 @@ class KDECopulaNNPdf(BaseEstimator):
                     use_KDE=self.use_KDE
                 ),
                 PCA(
-                    n_components=n_features, 
-                    whiten=False, 
+                    n_components=n_features,
+                    whiten=False,
                     copy=self.copy,
                     random_state=self.random_state,
                 ),
@@ -257,6 +257,9 @@ class KDECopulaNNPdf(BaseEstimator):
 
         self.logger.info(f'Configuring Bayesian Network (cat+num).')
         # discretize continuous variables; use these as input to model bayesian network
+        if not isinstance(self.n_uniform_bins, int):
+            self.n_uniform_bins = len(np.histogram_bin_edges(X_uniform, bins=self.n_uniform_bins))
+        self.logger.info(f'n_uniform_bins = {self.n_uniform_bins}')
         bin_width = 1. / self.n_uniform_bins
         X_num_discrete = np.floor(X_uniform / bin_width)
         X_num_discrete[X_num_discrete >= self.n_uniform_bins] = self.n_uniform_bins - 1  # correct for values at 1.
@@ -358,7 +361,7 @@ class KDECopulaNNPdf(BaseEstimator):
             self._fit_classifier(X1=X_trans[:, self.nonlinear_indices_], X0=X_bn[:, self.nonlinear_indices_],
                                  bins=self.n_calibration_bins)
 
-    def _fit_classifier(self, X1, bins=100, X0=None):
+    def _fit_classifier(self, X1, bins=None, X0=None):
         """ The neural network below captures the residual non-linearity after the transformations above.
 
         :param X1: array_like, shape (n_samples, n_features)
@@ -397,6 +400,12 @@ class KDECopulaNNPdf(BaseEstimator):
         p1 = self.clf.predict_proba(X1_test)[:, 1]
 
         # next: evaluation of calibration and sample weights
+        if not isinstance(bins, int):
+            bins = min(len(np.histogram_bin_edges(p0, bins=bins)),
+                       len(np.histogram_bin_edges(p1, bins=bins))
+                       )
+
+        self.logger.info(f'N_bins = {bins}')
         hist_p0, bin_edges = np.histogram(p0, bins=bins, range=(0, 1))
         hist_p1, bin_edges = np.histogram(p1, bins=bins, range=(0, 1))
         self._calibrate_classifier(hist_p0, hist_p1, bin_edges)
@@ -680,7 +689,6 @@ class KDECopulaNNPdf(BaseEstimator):
             corresponds to a single data point.
         :return: tuple of selected indices of non-linear variables and residual variables
         """
-        import pandas as pd
         import phik
 
         n_features = X_discrete.shape[1]
@@ -912,7 +920,7 @@ class KDECopulaNNPdf(BaseEstimator):
         """
         if random_state is not None:
             seed(random_state)
-            
+
         if mode == 'expensive':
             # all samples are unique
 
@@ -924,11 +932,11 @@ class KDECopulaNNPdf(BaseEstimator):
             tempu = np.random.uniform(0, tempweight_max, size=1000)
             tempkeep = tempu < tempsample_weights
             tempdata = tempdata[tempkeep]
-            
+
             accratio = tempdata.shape[0] / 1000
             n_tries = int(np.ceil(1/accratio*n_samples)) + 1000
-            
-            #n_tries = 10*n_samples
+
+            # n_tries = 10*n_samples
             data, sample_weights = self._sample_no_transform(n_tries, random_state, show_progress=show_progress,
                                                              apply_calibration=apply_calibration)
             # apply accept-reject method
@@ -936,7 +944,7 @@ class KDECopulaNNPdf(BaseEstimator):
             u = np.random.uniform(0, weight_max, size=n_tries)
             keep = u < sample_weights
             data = data[keep]
-            
+
             if data.shape[0] > n_samples:
                 data = data[:n_samples]
 
