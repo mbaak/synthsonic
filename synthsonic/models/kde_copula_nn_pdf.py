@@ -491,7 +491,7 @@ class KDECopulaNNPdf(BaseEstimator):
             fill_value="extrapolate"
         )
 
-        max_p1f = self.p1f_(bin_centers[-1])
+        max_p1f = np.max(p1pred)
         self.max_weight_ = max_p1f / (1. - max_p1f)
         self.logger.info(f'Maximum weight found: {self.max_weight_}')
 
@@ -503,7 +503,7 @@ class KDECopulaNNPdf(BaseEstimator):
             plt.legend()
             plt.show()
 
-    def _transform_and_slice(self, X):
+    def _transform_and_slice(self, X, discretize=False):
         """
 
         :param X:
@@ -515,6 +515,11 @@ class KDECopulaNNPdf(BaseEstimator):
             X_num = check_array(X_num, copy=self.copy, dtype=FLOAT_DTYPES, force_all_finite="allow-nan")
 
         U = self.pipe_.transform(X_num) if X_num.shape[1] > 0 else np.empty_like(X_num)
+        if discretize:
+            bin_width = 1. / self.n_uniform_bins
+            U = np.floor(U / bin_width)
+            U[U >= self.n_uniform_bins] = self.n_uniform_bins - 1  # correct for values at 1.
+
         X_trans = self._join_and_reorder(X_cat, U, self.categorical_columns, self.numerical_columns)
         return X_trans[:, self.nonlinear_indices_] if self.n_vars_ >= 2 else X_trans
 
@@ -847,7 +852,8 @@ class KDECopulaNNPdf(BaseEstimator):
         """
         return np.sum(self.score_samples(X))
 
-    def sample(self, n_samples=1, random_state=None, show_progress=False, apply_calibration=True):
+    def sample(self, n_samples=1, random_state=None, show_progress=False, apply_calibration=True,
+               inverse_transform=True):
         """Generate random samples from the model.
 
         :param n_samples: int, optional
@@ -865,7 +871,8 @@ class KDECopulaNNPdf(BaseEstimator):
         n_features = len(self.numerical_columns)
         X_cat = X[:, self.categorical_columns]
         X_num = X[:, self.numerical_columns]
-        X_num = self.pipe_.inverse_transform(X_num) if n_features > 0 else X_num
+        if inverse_transform:
+            X_num = self.pipe_.inverse_transform(X_num) if n_features > 0 else X_num
         return self._join_and_reorder(X_cat, X_num, self.categorical_columns, self.numerical_columns), sample_weights
 
     def _sample_no_transform(self, n_samples=1, random_state=None, show_progress=False, apply_calibration=True):
