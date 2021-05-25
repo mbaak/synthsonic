@@ -258,7 +258,10 @@ class KDECopulaNNPdf(BaseEstimator):
         self.logger.info(f'Configuring Bayesian Network (cat+num).')
         # discretize continuous variables; use these as input to model bayesian network
         if not isinstance(self.n_uniform_bins, int):
-            self.n_uniform_bins = len(np.histogram_bin_edges(X_uniform, bins=self.n_uniform_bins))
+            self.n_uniform_bins = min(
+                len(np.histogram_bin_edges(X_uniform, bins=self.n_uniform_bins)) - 1,
+                40
+            )
         self.logger.info(f'n_uniform_bins = {self.n_uniform_bins}')
         bin_width = 1. / self.n_uniform_bins
         X_num_discrete = np.floor(X_uniform / bin_width)
@@ -401,9 +404,10 @@ class KDECopulaNNPdf(BaseEstimator):
 
         # next: evaluation of calibration and sample weights
         if not isinstance(bins, int):
-            bins = min(len(np.histogram_bin_edges(p0, bins=bins)),
-                       len(np.histogram_bin_edges(p1, bins=bins))
-                       )
+            bins = min(
+                len(np.histogram_bin_edges(p0, bins=bins)) - 1,
+                len(np.histogram_bin_edges(p1, bins=bins)) - 1
+            )
 
         self.logger.info(f'N_bins = {bins}')
         hist_p0, bin_edges = np.histogram(p0, bins=bins, range=(0, 1))
