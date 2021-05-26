@@ -3,17 +3,17 @@ import pandas as pd
 import logging
 import itertools
 
+from tqdm import tqdm
+
 from synthsonic.models.kde_quantile_tranformer import KDEQuantileTransformer
 from synthsonic.models.phik_utils import phik_matrix
 
 from sklearn.base import BaseEstimator
 from sklearn.utils import check_array
-from sklearn.utils.validation import FLOAT_DTYPES # check_is_fitted, _deprecate_positional_args
+from sklearn.utils.validation import FLOAT_DTYPES
 from sklearn.decomposition import PCA
 from sklearn.feature_selection import mutual_info_regression
 from sklearn.pipeline import make_pipeline
-from sklearn.neural_network import MLPClassifier
-from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import train_test_split
 from sklearn.isotonic import IsotonicRegression
 
@@ -25,9 +25,10 @@ from pgmpy.sampling import BayesianModelSampling
 from pgmpy.inference import BayesianModelProbability
 
 import matplotlib.pyplot as plt
+import phik
 from scipy import interpolate
 
-from random import choices, seed
+import random
 
 
 class KDECopulaNNPdf(BaseEstimator):
@@ -42,38 +43,51 @@ class KDECopulaNNPdf(BaseEstimator):
     6. NN classifier to model the copula space of the selected top-n variables.
     7. Recalibration of classifier probabilities.
     """
-    def __init__(self,
-                 numerical_columns=[],
-                 categorical_columns=[],
-                 distinct_threshold=-1,
-                 n_quantiles=500,
-                 mirror_left=None,
-                 mirror_right=None,
-                 rho=0.5,
-                 n_adaptive=1,
-                 x_min=None,
-                 x_max=None,
-                 do_PCA=True,
-                 ordering='pca',
-                 min_pca_variance=1.00,
-                 min_mutual_information=0,
-                 min_phik_correlation=0,
-                 n_nonlinear_vars=None,
-                 force_uncorrelated=False,
-                 # clf=MLPClassifier(random_state=0, max_iter=1000, early_stopping=True),
-                 clf=XGBClassifier(n_estimators=250, reg_lambda=1, gamma=0, max_depth=9, use_label_encoder=False,
-                                     eval_metric='logloss'),
-                 random_state=0,
-                 use_inverse_qt=False,
-                 use_KDE=True,
-                 n_uniform_bins='auto',
-                 n_calibration_bins='auto',
-                 test_size=0.35,
-                 copy=True,
-                 clffitkw={},
-                 estimator_type="tan",
-                 edge_weights_fn="mutual_info",
-                 class_node=1):
+    def __init__(
+        self,
+        numerical_columns=[],
+        categorical_columns=[],
+        distinct_threshold=-1,
+        n_quantiles=500,
+        mirror_left=None,
+        mirror_right=None,
+        rho=0.5,
+        n_adaptive=1,
+        x_min=None,
+        x_max=None,
+        do_PCA=True,
+        ordering='pca',
+        min_pca_variance=1.00,
+        min_mutual_information=0,
+        min_phik_correlation=0,
+        n_nonlinear_vars=None,
+        force_uncorrelated=False,
+        # clf=MLPClassifier(random_state=0, max_iter=1000, early_stopping=True),
+        clf = XGBClassifier(
+            n_estimators=250,
+            reg_lambda=1,
+            gamma=0,
+            max_depth=9,
+            use_label_encoder=False,
+            eval_metric='logloss',
+            random_state=0,
+        ),
+        random_state=0,
+        use_inverse_qt=False,
+        use_KDE=False,
+        n_uniform_bins=25,
+        n_calibration_bins=100,
+        test_size=0.35,
+        copy=True,
+        clffitkw={},
+        estimator_type="tan",
+        edge_weights_fn="mutual_info",
+        class_node=1,
+        bm_fit_args={},  # ex: estimator=BayesianEstimator, prior_type='dirichlet', pseudo_counts=0.1
+        apply_calibration=True,
+        isotonic_increasing="auto",  # or True
+        verbose=True,
+    ):
         """Parameters of the KDECopulaNNPdf class
 
         KDECopulaNNPdf applies 7 steps to model any data distribution, where the variables are continuous:
@@ -141,12 +155,21 @@ class KDECopulaNNPdf(BaseEstimator):
         self.clf = clf
         self.logger = logging.getLogger(self.__class__.__name__)
         self.n_uniform_bins = n_uniform_bins
+        # Calibration
+        self.apply_calibration = apply_calibration
         self.n_calibration_bins = n_calibration_bins
         self.test_size = test_size
         self.clffitkw = clffitkw
+        self.isotonic_increasing = isotonic_increasing
+
+        # Bayesian network
         self.estimator_type = estimator_type
         self.edge_weights_fn = edge_weights_fn
         self.class_node = class_node
+        self.bm_fit_args = bm_fit_args
+
+        # Logging
+        self.verbose = verbose
 
         # basic checks on attributes
         if self.min_pca_variance < 0 or self.min_pca_variance > 1:
@@ -158,7 +181,7 @@ class KDECopulaNNPdf(BaseEstimator):
         if self.n_nonlinear_vars is not None:
             if not isinstance(self.n_nonlinear_vars, (int, float, np.number)) or self.n_nonlinear_vars < 1:
                 raise ValueError("Invalid value for 'n_nonlinear_vars': %d. Should be an int greater than zero." % self.n_nonlinear_vars)
-        if self.ordering not in ['pca', 'mi', 'phik']:
+        if self.ordering not in ['pca', 'mi', 'phik', '']:
             raise ValueError("Non-linear variables should be ordered by 'pca', mutual information 'mi', or 'phik'.")
 
     def fit(self, X, y=None):
@@ -181,8 +204,7 @@ class KDECopulaNNPdf(BaseEstimator):
                 self.categorical_columns.append(i)
             else:
                 self.numerical_columns.append(i)
-        self.logger.info('Processing {n_num:d} numerical and {n_cat:d} categorical columns'.format(
-            n_num=len(self.numerical_columns), n_cat=len(self.categorical_columns)))
+        self.logger.info(f'Processing {len(self.numerical_columns):d} numerical and {len(self.categorical_columns):d} categorical columns')
         X_cat = X[:, self.categorical_columns]
         X_num = X[:, self.numerical_columns]
         if len(self.numerical_columns) > 0:
@@ -192,12 +214,14 @@ class KDECopulaNNPdf(BaseEstimator):
         n_samples, n_features = X_num.shape
 
         if self.n_quantiles > n_samples:
-            self.logger.warning("n_quantiles (%s) is greater than the total number of samples (%s). n_quantiles is set to num samples." % (self.n_quantiles, n_samples))
-        self.n_quantiles = max(1, min(self.n_quantiles, n_samples))
-        if self.n_nonlinear_vars is not None:
-            if self.n_nonlinear_vars > n_features:
-                self.logger.warning("n_nonlinear_vars (%d) is greater than the total number of features (%d). n_nonlinear_vars is set to num features." % (self.n_nonlinear_vars, n_features))
-                self.n_nonlinear_vars = min(self.n_nonlinear_vars, n_features)
+            self.logger.warning(f"n_quantiles ({self.n_quantiles}) is greater than the total number of samples ({n_samples}). n_quantiles is set to num samples.")
+            self.n_quantiles = n_samples
+        if self.n_quantiles < 1:
+            self.logger.warning(f"n_quantiles ({self.n_quantiles}) is lower than 1. n_quantiles is set to 1.")
+            self.n_quantiles = 1
+        if self.n_nonlinear_vars is not None and self.n_nonlinear_vars > n_features:
+            self.logger.warning(f"n_nonlinear_vars ({self.n_nonlinear_vars:d}) is greater than the total number of features ({n_features:d}). n_nonlinear_vars is set to num features.")
+            self.n_nonlinear_vars = n_features
         if not self.do_PCA and self.ordering == 'pca':
             self.logger.warning("Cannot order non-linear variables by pca (turned off). Switching to mutual information.")
             self.ordering = 'mi'
@@ -262,7 +286,10 @@ class KDECopulaNNPdf(BaseEstimator):
                 len(np.histogram_bin_edges(X_uniform, bins=self.n_uniform_bins)) - 1,
                 40
             )
-        self.logger.info(f'n_uniform_bins = {self.n_uniform_bins}')
+            self.logger.info(f'automatically set n_uniform_bins = {self.n_uniform_bins}')
+        else:
+            self.logger.info(f'n_uniform_bins = {self.n_uniform_bins}')
+
         bin_width = 1. / self.n_uniform_bins
         X_num_discrete = np.floor(X_uniform / bin_width)
         X_num_discrete[X_num_discrete >= self.n_uniform_bins] = self.n_uniform_bins - 1  # correct for values at 1.
@@ -276,7 +303,7 @@ class KDECopulaNNPdf(BaseEstimator):
 
         return self
 
-    def _configure_bayesian_network(self, X_discrete):
+    def _configure_bayesian_network(self, X_discrete, plot_structure=False):
         """ Distretize uniform variables and fit Bayesian network
 
         :param X_cat:
@@ -289,11 +316,24 @@ class KDECopulaNNPdf(BaseEstimator):
         # "tan" bayesian network needs string column names
         df.columns = [str(c) for c in df.columns]
         est = TreeSearch(df, root_node=df.columns[0])
-        dag = est.estimate(estimator_type=self.estimator_type, class_node=str(self.class_node), show_progress=True,
-                           edge_weights_fn=self.edge_weights_fn)
+        dag = est.estimate(
+            estimator_type=self.estimator_type,
+            class_node=str(self.class_node) if self.class_node is not None else None,
+            show_progress=self.verbose,
+            edge_weights_fn=self.edge_weights_fn
+        )
+
+        if plot_structure:
+            from networkx.drawing.nx_agraph import graphviz_layout
+            import networkx as nx
+
+            pos = graphviz_layout(dag, prog='dot')
+            nx.draw(dag, pos, with_labels=True, arrowsize=10, node_size=600, alpha=0.8, font_weight='bold')
+            plt.show()
+
         # model the conditional probabilities
         self.bn = BayesianModel(dag.edges())
-        self.bn.fit(df)
+        self.bn.fit(df, **self.bm_fit_args)
         # initialize sampler with fitted model
         self.bn_sampler = BayesianModelSampling(self.bn)
         self.bn_prob = BayesianModelProbability(self.bn)
@@ -392,33 +432,37 @@ class KDECopulaNNPdf(BaseEstimator):
         # self.train_data = (X_train, y_train)
         # self.test_data = (X1_test, y1_test)
 
-        # Calibrate probabilities manually. (Used for weights calculation.)
-        self.logger.info(f'Calibrating classifier.')
+        if self.apply_calibration:
+            # Calibrate probabilities manually. (Used for weights calculation.)
+            self.logger.info(f'Calibrating classifier')
+            X0_test = X0[X1_train.shape[0]:] if X0 is not None else \
+                self._sample_bayesian_network(
+                    size=max(250000, X1_test.shape[0]),
+                    show_progress=True,
+                )[:, self.nonlinear_indices_]
 
-        X0_test = X0[X1_train.shape[0]:] if X0 is not None else \
-            self._sample_bayesian_network(size=max(250000, X1_test.shape[0]),
-                                          show_progress=True)[:, self.nonlinear_indices_]
+            p0 = self.clf.predict_proba(X0_test)[:, 1]
+            p1 = self.clf.predict_proba(X1_test)[:, 1]
 
-        p0 = self.clf.predict_proba(X0_test)[:, 1]
-        p1 = self.clf.predict_proba(X1_test)[:, 1]
+            # next: evaluation of calibration and sample weights
+            if not isinstance(bins, int):
+                bins = min(min(
+                    len(np.histogram_bin_edges(p0, bins=bins)) - 1,
+                    len(np.histogram_bin_edges(p1, bins=bins)) - 1
+                ), 100)
+                self.logger.info(f'automatically set N_calibration_bins = {bins}')
+            else:
+                self.logger.info(f'N_calibration_bins = {bins}')
 
-        # next: evaluation of calibration and sample weights
-        if not isinstance(bins, int):
-            bins = min(
-                len(np.histogram_bin_edges(p0, bins=bins)) - 1,
-                len(np.histogram_bin_edges(p1, bins=bins)) - 1
-            )
+            hist_p0, bin_edges = np.histogram(p0, bins=bins, range=(0, 1))
+            hist_p1, bin_edges = np.histogram(p1, bins=bins, range=(0, 1))
+            self._calibrate_classifier(hist_p0, hist_p1, bin_edges)
 
-        self.logger.info(f'N_bins = {bins}')
-        hist_p0, bin_edges = np.histogram(p0, bins=bins, range=(0, 1))
-        hist_p1, bin_edges = np.histogram(p1, bins=bins, range=(0, 1))
-        self._calibrate_classifier(hist_p0, hist_p1, bin_edges)
-
-        # storing these for validation later on
-        self.hist_p0_ = hist_p0
-        self.hist_p1_ = hist_p1
-        self.bin_edges_ = bin_edges
-        self.bin_centers_ = (bin_edges[:-1] + bin_edges[1:]) / 2.
+            # storing these for validation later on
+            self.hist_p0_ = hist_p0
+            self.hist_p1_ = hist_p1
+            self.bin_edges_ = bin_edges
+            self.bin_centers_ = (bin_edges[:-1] + bin_edges[1:]) / 2.
 
     def _calibrate_classifier(self, hist_p0, hist_p1, bin_edges, use_sample_weights=True, validation_plots=False):
         """ Calibrate classifier based on probability histograms
@@ -484,7 +528,7 @@ class KDECopulaNNPdf(BaseEstimator):
         # isotonic regression assumes that p1 can only be a rising function.
         # (we're assuming that if a classifier predicts a higher probability, the calibrated probability
         # will also be higher. This will generally be a safe assumption.)
-        iso_reg = IsotonicRegression(y_min=0, y_max=1, increasing='auto').fit(bin_centers, p1cb, sample_weight)
+        iso_reg = IsotonicRegression(y_min=0, y_max=1, increasing=self.isotonic_increasing).fit(bin_centers, p1cb, sample_weight)
         # iso_reg = IsotonicRegression(y_min=0, y_max=1).fit(bin_centers, p1cb)
         p1pred = iso_reg.predict(bin_centers)
         self.p1f_ = interpolate.interp1d(
@@ -496,6 +540,7 @@ class KDECopulaNNPdf(BaseEstimator):
         )
 
         max_p1f = np.max(p1pred)
+        # assert self.p1f_(bin_centers[-1]) == max_p1f
         self.max_weight_ = max_p1f / (1. - max_p1f)
         self.logger.info(f'Maximum weight found: {self.max_weight_}')
 
@@ -533,10 +578,10 @@ class KDECopulaNNPdf(BaseEstimator):
         :param X:
         :return:
         """
-        X_slice  = self._transform_and_slice(X)
+        X_slice = self._transform_and_slice(X)
         return self.clf.predict_proba(X_slice)
 
-    def _scale(self, X, apply_calibration=True):
+    def _scale(self, X):
         """ Determine density of the Copula space for input data points
 
         :param X: array_like, shape (n_samples, n_features)
@@ -550,7 +595,7 @@ class KDECopulaNNPdf(BaseEstimator):
             return np.ones(n_samples)
 
         prob = self.clf.predict_proba(X)[:, 1]
-        nominator = self.p1f_(prob) if apply_calibration else prob
+        nominator = self.p1f_(prob) if self.apply_calibration else prob
         denominator = 1. - nominator
         # calculate ratio. In case denominator is zero, return 1 as ratio.
         ratio = np.divide(nominator, denominator, out=np.ones_like(nominator), where=denominator != 0)
@@ -563,7 +608,7 @@ class KDECopulaNNPdf(BaseEstimator):
             List of n_features-dimensional data points.  Each row
             corresponds to a single data point.
         """
-        # determine number of variables and bins to use for classifiere.
+        # determine number of variables and bins to use for classifier.
         if self.ordering == "mi":
             self.logger.info(f'Selecting non-linear features: {self.ordering}')
             self.nonlinear_indices_, self.residual_indices_ = self._configure_vars_mi(X_discrete, X_expect)
@@ -646,8 +691,8 @@ class KDECopulaNNPdf(BaseEstimator):
 
         # use mutual information to capture residual levels of non-linearity
         mi = np.zeros((n_features, n_features))
-        for i in range(n_features):
-            mi[i, :] = mutual_info_regression(X_discrete, X_discrete[:, i], random_state=self.random_state)
+        for i in tqdm(range(n_features), description='mutual info regression', total=n_features):
+            mi[i, :] = mutual_info_regression(X_discrete, X_discrete[:, i], random_state=self.random_state + i)
 
         # select all off-diagonal mutual information values and index pairs
         mis = []
@@ -698,8 +743,6 @@ class KDECopulaNNPdf(BaseEstimator):
             corresponds to a single data point.
         :return: tuple of selected indices of non-linear variables and residual variables
         """
-        import phik
-
         n_features = X_discrete.shape[1]
 
         # obvious cases
@@ -856,8 +899,7 @@ class KDECopulaNNPdf(BaseEstimator):
         """
         return np.sum(self.score_samples(X))
 
-    def sample(self, n_samples=1, random_state=None, show_progress=False, apply_calibration=True,
-               inverse_transform=True):
+    def sample(self, n_samples=1, random_state=None, show_progress=False, inverse_transform=True):
         """Generate random samples from the model.
 
         :param n_samples: int, optional
@@ -870,8 +912,7 @@ class KDECopulaNNPdf(BaseEstimator):
         :return: array_like, shape (n_samples, n_features)
             List of samples, sample weights
         """
-        X, sample_weights = self._sample_no_transform(n_samples, random_state, show_progress=show_progress,
-                                                      apply_calibration=apply_calibration)
+        X, sample_weights = self._sample_no_transform(n_samples, random_state, show_progress=show_progress)
         n_features = len(self.numerical_columns)
         X_cat = X[:, self.categorical_columns]
         X_num = X[:, self.numerical_columns]
@@ -879,7 +920,7 @@ class KDECopulaNNPdf(BaseEstimator):
             X_num = self.pipe_.inverse_transform(X_num) if n_features > 0 else X_num
         return self._join_and_reorder(X_cat, X_num, self.categorical_columns, self.numerical_columns), sample_weights
 
-    def _sample_no_transform(self, n_samples=1, random_state=None, show_progress=False, apply_calibration=True):
+    def _sample_no_transform(self, n_samples=1, random_state=None, show_progress=False):
         """Generate uniform random samples from the model.
 
         No inverse feature transformations are applied.
@@ -904,12 +945,18 @@ class KDECopulaNNPdf(BaseEstimator):
 
         # generate nonlinear variables with accept-reject method
         data = self._sample_bayesian_network(size=n_samples, show_progress=show_progress, seed=random_state)
-        sample_weights = self._scale(data[:, self.nonlinear_indices_], apply_calibration=apply_calibration)
+        sample_weights = self._scale(data[:, self.nonlinear_indices_])
 
         return data, sample_weights
 
-    def sample_no_weights(self, n_samples=1, random_state=None, mode='expensive', show_progress=False,
-                          inverse_transform=True, cheap_factor=1, apply_calibration=True):
+    def sample_no_weights(
+        self,
+        n_samples=1,
+        random_state=None,
+        mode='expensive',
+        inverse_transform=True,
+        cheap_factor=1
+    ):
         """Generate random samples from the model.
 
         Use accept-reject to get rid of sample weights.
@@ -929,15 +976,15 @@ class KDECopulaNNPdf(BaseEstimator):
         :return: array_like, shape (n_samples, n_features)
             List of samples.
         """
-        if random_state is not None:
-            seed(random_state)
+        if random_state is not None and isinstance(random_state, int):
+            random.seed(random_state)
 
         if mode == 'expensive':
             # all samples are unique
 
             # estimate the acceptance ratio to estimate n_tries required to get desired sample size
-            tempdata, tempsample_weights = self._sample_no_transform(1000, random_state, show_progress=False,
-                                                                     apply_calibration=apply_calibration)
+            tempdata, tempsample_weights = self._sample_no_transform(1000, random_state, show_progress=False)
+
             # apply accept-reject method
             tempweight_max = np.max(tempsample_weights)
             tempu = np.random.uniform(0, tempweight_max, size=1000)
@@ -947,9 +994,9 @@ class KDECopulaNNPdf(BaseEstimator):
             accratio = tempdata.shape[0] / 1000
             n_tries = int(np.ceil(1/accratio*n_samples)) + 1000
 
-            # n_tries = 10*n_samples
-            data, sample_weights = self._sample_no_transform(n_tries, random_state, show_progress=show_progress,
-                                                             apply_calibration=apply_calibration)
+            #n_tries = 10*n_samples
+            data, sample_weights = self._sample_no_transform(n_tries, random_state, show_progress=self.verbose)
+
             # apply accept-reject method
             weight_max = np.max(sample_weights)
             u = np.random.uniform(0, weight_max, size=n_tries)
@@ -961,16 +1008,19 @@ class KDECopulaNNPdf(BaseEstimator):
 
         elif mode == 'cheap':
             # generated samples are dropped or duplicated to match weights
-            data, sample_weights = self._sample_no_transform(n_samples * cheap_factor, random_state,
-                                                             show_progress=show_progress,
-                                                             apply_calibration=apply_calibration)
+            data, sample_weights = self._sample_no_transform(
+                n_samples * cheap_factor,
+                random_state,
+                show_progress=self.verbose
+            )
             pop = np.asarray(range(data.shape[0]))
             probs = sample_weights/np.sum(sample_weights)
-            sample = choices(pop, probs, k=n_samples)
+            sample = random.choices(pop, probs, k=n_samples)
             data = data[sample]
-
         elif mode == 'ignore_weights':
-            data, _ = self._sample_no_transform(n_samples, random_state, show_progress=show_progress)
+            data, _ = self._sample_no_transform(n_samples, random_state, show_progress=self.verbose)
+        else:
+            raise ValueError("mode should be 'expensive', 'cheap' or 'ignore_weights'")
 
         if not inverse_transform:
             return data
