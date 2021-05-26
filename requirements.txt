@@ -7,3 +7,4 @@ matplotlib>=3.2.1
 scipy<1.6.0>=1.1.0
 phik>=0.11.1
 cython>=0.29.22
+pgmpy @ git+https://github.com/sbrugman/pgmpy.git@sampling_speedups
