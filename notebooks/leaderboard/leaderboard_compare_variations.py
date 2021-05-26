@@ -1,6 +1,5 @@
 """
-Script to compare variations of Synthsonic. Used for the paper's ablation study / comparing extensions across datasets.
-
+Script to compare variations of Synthsonic. Used for the paper's ablation study / comparing extensions across datasets.	
 """
 import multiprocessing
 import time
@@ -11,12 +10,30 @@ from pgmpy.estimators import BayesianEstimator
 from sklearn.metrics import normalized_mutual_info_score
 from xgboost import XGBClassifier
 import logging
+
 from sdgym import run
 from sdgym.data import load_dataset
-from sdgym.synthesizers.base import BaseSynthesize
+from sdgym.synthesizers.base import BaseSynthesizer
+from sdgym.synthesizers import (
+    CTGAN,
+    TVAESynthesizer,
+    CopulaGAN,
+    UniformSynthesizer,
+    IndependentSynthesizer,
+    CLBNSynthesizer,
+    GaussianCopulaCategorical,
+    GaussianCopulaCategoricalFuzzy,
+    GaussianCopulaOneHot,
+    PrivBNSynthesizer,
+    IdentitySynthesizer,
+    # Slow
+    TableganSynthesizer,
+    # Issues
+    # - https://github.com/pytorch/pytorch/issues/39141
+    # VEEGANSynthesizer,
+)
 import numpy as np
 from phik.phik import phik_from_binned_array
-
 from synthsonic.models.kde_copula_nn_pdf import KDECopulaNNPdf
 
 
@@ -97,7 +114,7 @@ settings = {
     # Real
     # ============================================
     'census': {
-        
+
     },
     'credit': {
 
@@ -109,7 +126,7 @@ settings = {
         },
     },
     'intrusion': {
-        
+
     },
     'covtype': {
         'pdf_args':{
@@ -137,11 +154,11 @@ choices = [
 ]
 dsets_bn = ['child', 'asia', 'insurance', 'alarm']
 dsets_gm = ['ring', 'gridr', 'grid']
-dsets_rl = ['covtype', 'intrusion', 'adult', 'credit', 'news', 'census']
+dsets_rl = ['adult', 'news', 'covtype', 'intrusion', 'credit', 'census']
 dsets_all = dsets_gm + dsets_bn + dsets_rl
 
-dsets = dsets_all
-
+dsets = ['adult']
+dsets = ['grid']
 
 def get_label_col(dataset_name):
     _, _, meta, _, _ = load_dataset(dataset_name, benchmark=True)
@@ -151,7 +168,7 @@ def get_label_col(dataset_name):
     return -1
 
 
-def factory(my_sets, my_ablation):
+def factory(my_sets, my_ablation, dataset):
     class BaseClass(BaseSynthesizer):
         def __init__(self, iterations):
             self.random_state = my_sets['random_state'] + iterations * 1000
@@ -190,10 +207,11 @@ def factory(my_sets, my_ablation):
             return X_gen
 
     class NewClass(BaseClass): pass
-    NewClass.__name__ = f"Synthsonic[{my_ablation}]"
+    NewClass.__name__ = f"Synthsonic[{my_ablation}][{dataset}]"
     return deepcopy(NewClass)
 
 
+assert len(dsets) == 1, "only one dataset supported, buggy otherwise"
 for dataset_name in dsets:
     all_synthesizers = []
     for start_seed, ablation in enumerate(choices, start=1337):
@@ -247,7 +265,7 @@ for dataset_name in dsets:
 
         print(f'ablation={ablation}, dataset_name={dataset_name}, current settings={current_settings}, seed={start_seed}')
 
-        all_synthesizers.append(factory(deepcopy(current_settings), ablation))
+        all_synthesizers.append(factory(deepcopy(current_settings), ablation, dataset_name))
 
     try:
         datasets = [dataset_name]
@@ -256,15 +274,17 @@ for dataset_name in dsets:
             datasets=datasets,
             iterations=3,
             add_leaderboard=False,
-            workers=int(multiprocessing.cpu_count() / 2)
+            cache_dir="ablation/",
+            # workers=int(multiprocessing.cpu_count() / 2)
         )
         time_str = time.strftime("%Y-%m-%d_%H-%M-%S")
         scores.to_csv(f"ablation/scores_{dataset_name}_{time_str}.csv")
 
         df = scores.copy(deep=True)
-        total = df.loc['Synthsonic[all]'].copy()
+        total = df.loc[f'Synthsonic[all][{dataset_name}]'].copy()
         df = df - total.values.squeeze()
-        df.loc['Synthsonic[all]'] = total
+        df.loc[f'Synthsonic[all][{dataset_name}]'] = total
         df.to_csv(f"ablation/diff_scores_{dataset_name}_{time_str}.csv")
     except ValueError:
         print(f"Failed to compute {dataset_name} scores")
+    del all_synthesizers
