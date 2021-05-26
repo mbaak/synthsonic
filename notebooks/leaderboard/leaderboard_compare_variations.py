@@ -272,7 +272,7 @@ for dataset_name in dsets:
         scores = run(
             synthesizers=all_synthesizers,
             datasets=datasets,
-            iterations=3,
+            iterations=1,
             add_leaderboard=False,
             cache_dir="ablation/",
             # workers=int(multiprocessing.cpu_count() / 2)
