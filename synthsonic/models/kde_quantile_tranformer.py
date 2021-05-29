@@ -217,14 +217,15 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         # calculate quantiles and pdf
         for i in range(n_features):
             x = X[:, i]
-            qs = np.quantile(x, ps)
-            bin_entries, bin_edges = np.histogram(x, bins=qs)
-            bin_entries = bin_entries.astype(float) / n_samples
+            bin_edges = np.quantile(x, ps)
+            bin_entries = [1./self.n_quantiles] * self.n_quantiles
             bin_diffs = np.diff(bin_edges)
             pdf_norm = np.divide(bin_entries, bin_diffs, out=np.zeros_like(bin_entries), where=bin_diffs != 0)
-            fast_pdf = interpolate.interp1d(bin_edges[:-1], pdf_norm, kind='previous', bounds_error=False,
+            # ensure interpolate works up to last bin edge, somehow ignored otherwise
+            pdf_norm = np.concatenate([pdf_norm, [pdf_norm[-1]]])
+            fast_pdf = interpolate.interp1d(bin_edges, pdf_norm, kind='previous', bounds_error=False,
                                             fill_value=(min_pdf_value, min_pdf_value))
-            self.pdf_.append({'fast': fast_pdf})
+            self.pdf_.append({'fast': fast_pdf, 'bin_edges': bin_edges, 'bin_entries': bin_entries})
 
     def _kde_fit(self, X):
         """Internal function to compute the kde-based quantiles used for transforming.

@@ -251,7 +251,7 @@ class KDECopulaNNPdf(BaseEstimator):
                 KDEQuantileTransformer(
                     n_quantiles=self.n_quantiles,
                     output_distribution='uniform',
-                    rho=min(self.rho, 0.2),
+                    rho=max(self.rho, 0.2),
                     n_adaptive=self.n_adaptive,
                     use_inverse_qt=True,
                     copy=self.copy,
@@ -450,9 +450,9 @@ class KDECopulaNNPdf(BaseEstimator):
                     len(np.histogram_bin_edges(p0, bins=bins)) - 1,
                     len(np.histogram_bin_edges(p1, bins=bins)) - 1
                 ), 100)
-                self.logger.info(f'automatically set N_calibration_bins = {bins}')
+                self.logger.info(f'automatically set n_calibration_bins = {bins}')
             else:
-                self.logger.info(f'N_calibration_bins = {bins}')
+                self.logger.info(f'n_calibration_bins = {bins}')
 
             hist_p0, bin_edges = np.histogram(p0, bins=bins, range=(0, 1))
             hist_p1, bin_edges = np.histogram(p1, bins=bins, range=(0, 1))
@@ -541,8 +541,8 @@ class KDECopulaNNPdf(BaseEstimator):
 
         max_p1f = np.max(p1pred)
         # assert self.p1f_(bin_centers[-1]) == max_p1f
-        self.max_weight_ = max_p1f / (1. - max_p1f)
-        self.logger.info(f'Maximum weight found: {self.max_weight_}')
+        self.max_weight_ = max_p1f / (1. - max_p1f) if max_p1f != 1 else self.max_scale_value
+        self.logger.info(f'Maximum weight: {self.max_weight_}')
 
         if validation_plots:
             plt.figure(figsize=(12, 7))
@@ -800,7 +800,7 @@ class KDECopulaNNPdf(BaseEstimator):
 
         return nonlinear_indices, residual_indices
 
-    def logpdf(self, X):
+    def logpdf(self, X, add_cat=True, add_num=True, add_nonlin=True):
         """Evaluate the logarithmic probability of each point in a data set.
 
         :param X: array_like, shape (n_samples, n_features)
@@ -836,8 +836,10 @@ class KDECopulaNNPdf(BaseEstimator):
         log_p_num = np.zeros_like(log_p_cat)
         if n_features > 0:
             # for numerical variables, use probability density calculation.
-            # first turn bn probability contribution of numerical variables into a density correction. (nominal value = 1.)
-            log_p_num += np.log(self.n_uniform_bins) * n_features
+            if add_cat:
+                # first turn bn probability contribution of numerical variables into a density correction.
+                # (nominal value = 1.)
+                log_p_num += np.log(self.n_uniform_bins) * n_features
             jac = self.pipe_[0].jacobian(X_num)
             log_p_num -= np.log(jac)
             if self.do_PCA and n_features >= 2 and not self.force_uncorrelated:
@@ -851,7 +853,14 @@ class KDECopulaNNPdf(BaseEstimator):
         X_slice = X_trans[:, self.nonlinear_indices_] if self.n_vars_ >= 2 else X_trans
         log_p_nonlin = np.log(self._scale(X_slice))
 
-        log_p = log_p_cat + log_p_num + log_p_nonlin
+        log_p = np.zeros_like(log_p_cat)
+        if add_cat:
+            log_p += log_p_cat
+        if add_num:
+            log_p += log_p_num
+        if add_nonlin:
+            log_p += log_p_nonlin
+        # log_p = log_p_cat + log_p_num + log_p_nonlin
         return log_p
 
     def pdf(self, X):

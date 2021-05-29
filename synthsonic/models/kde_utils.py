@@ -470,10 +470,11 @@ def kde_make_transformers(bin_mean, bin_entries, band_width=None, x_min=None, x_
     # adding epsilon at point -1 to ensure that cumsum never reaches 1 and can always be inverted.
     cumsum = np.cumsum(integral_sections)
     kde_norm = cumsum[-1]
-    cumsum = cumsum / (kde_norm * (1. + epsilon))
+    cumsum_to = cumsum / (kde_norm * (1. + epsilon))
+    cumsum_from = cumsum / kde_norm
 
-    F = interpolate.interp1d(x_grid, cumsum, bounds_error=False, fill_value=(cumsum[0], cumsum[-1]))
-    Finv = interpolate.interp1d(cumsum, x_grid, bounds_error=False, fill_value="extrapolate")
+    F = interpolate.interp1d(x_grid, cumsum_to, bounds_error=False, fill_value=(cumsum[0], cumsum[-1]))
+    Finv = interpolate.interp1d(cumsum_from, x_grid, bounds_error=False, fill_value="extrapolate")
 
     pdf_norm = p_grid / kde_norm
     fast_pdf = interpolate.interp1d(x_grid, pdf_norm, bounds_error=False, fill_value=(min_pdf_value, min_pdf_value))
