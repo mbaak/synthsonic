@@ -1,3 +1,5 @@
+from typing import Union
+
 import numpy as np
 import pandas as pd
 import logging
@@ -5,6 +7,7 @@ import itertools
 
 from tqdm import tqdm
 
+from synthsonic.models.discretize import discretize, guess_column_bins, inv_discretize
 from synthsonic.models.kde_quantile_tranformer import KDEQuantileTransformer
 from synthsonic.models.phik_utils import phik_matrix
 
@@ -75,7 +78,7 @@ class KDECopulaNNPdf(BaseEstimator):
         random_state=0,
         use_inverse_qt=False,
         use_KDE=False,
-        n_uniform_bins=25,
+        n_uniform_bins : Union[int, list, tuple, np.ndarray, str] = 25,
         n_calibration_bins=100,
         test_size=0.35,
         copy=True,
@@ -128,6 +131,13 @@ class KDECopulaNNPdf(BaseEstimator):
         :param bool use_inverse_qt: Default is False. If true, KDE is not used in inverse transformation.
         :param bool use_KDE: Default is True. If false, KDE smoothing is off, using default quantile transformation.
         :param copy: Copy the data before transforming. Default is True.
+        :param n_uniform_bins: number of bins to discretize numeric variables. If int, then used of all columns,
+            if list/tuple[int] or np.ndarray, then per variable/column. If str, then auto-guessed using numpy's histogram_bin_edges.
+            (See https://numpy.org/doc/stable/reference/generated/numpy.histogram_bin_edges.html for possible values) or
+            "knuth" for Knuth [1] (make sure to install astropy)
+
+            [1] K.H. “Optimal Data-Based Binning for Histograms”. arXiv:0605197, 2006
+                https://arxiv.org/pdf/physics/0605197.pdf
         """
         self.numerical_columns = numerical_columns
         self.categorical_columns = categorical_columns
@@ -281,18 +291,15 @@ class KDECopulaNNPdf(BaseEstimator):
 
         self.logger.info(f'Configuring Bayesian Network (cat+num).')
         # discretize continuous variables; use these as input to model bayesian network
-        if not isinstance(self.n_uniform_bins, int):
-            self.n_uniform_bins = min(
-                len(np.histogram_bin_edges(X_uniform, bins=self.n_uniform_bins)) - 1,
-                40
-            )
+        if not isinstance(self.n_uniform_bins, (int, list, tuple, np.ndarray)):
+            self.n_uniform_bins = guess_column_bins(X_uniform, bins=self.n_uniform_bins)
             self.logger.info(f'automatically set n_uniform_bins = {self.n_uniform_bins}')
         else:
             self.logger.info(f'n_uniform_bins = {self.n_uniform_bins}')
 
-        bin_width = 1. / self.n_uniform_bins
-        X_num_discrete = np.floor(X_uniform / bin_width)
-        X_num_discrete[X_num_discrete >= self.n_uniform_bins] = self.n_uniform_bins - 1  # correct for values at 1.
+        # discretize numeric variables
+        X_num_discrete = discretize(X_uniform, self.n_uniform_bins)
+
         # joining cat and num-discrete, then reorder to original order
         X_discrete = self._join_and_reorder(X_cat, X_num_discrete, self.categorical_columns, self.numerical_columns)
         self._configure_bayesian_network(X_discrete)
@@ -376,9 +383,8 @@ class KDECopulaNNPdf(BaseEstimator):
             X_bn = df[sorted(df.columns)].values
         if X_bn is not None and add_uniform and len(self.numerical_columns) > 0:
             # turn discrete numerical columns back to uniform
-            bin_width = 1. / self.n_uniform_bins
-            X_rand = np.random.uniform(low=0., high=bin_width, size=(X_bn.shape[0], len(self.numerical_columns)))
-            X_bn[:, self.numerical_columns] = X_bn[:, self.numerical_columns] * bin_width + X_rand
+            X_bn[:, self.numerical_columns] = inv_discretize(X_bn[:, self.numerical_columns], self.n_uniform_bins)
+
         return X_bn
 
     def _configure_classifier(self, X_discrete, X_trans):
@@ -398,11 +404,19 @@ class KDECopulaNNPdf(BaseEstimator):
         if self.n_vars_ >= 2 and not self.force_uncorrelated and self.clf is not None:
             self.logger.info(f'Fitting discriminative learner: selected {len(self.nonlinear_indices_)} features.')
             # reuse X_bn as test sample below, add uniform component here (generation from bn can be slow)
-            X_bn = self._sample_bayesian_network(X_bn=X_bn, add_uniform=True, show_progress=False, seed=self.random_state)
+            X_bn = self._sample_bayesian_network(
+                X_bn=X_bn,
+                add_uniform=True,
+                show_progress=False,
+                seed=self.random_state
+            )
             # this function captures in matrices the residual non-linearity after the transformations above.
             # note: residual vars are not used in classifier
-            self._fit_classifier(X1=X_trans[:, self.nonlinear_indices_], X0=X_bn[:, self.nonlinear_indices_],
-                                 bins=self.n_calibration_bins)
+            self._fit_classifier(
+                X1=X_trans[:, self.nonlinear_indices_],
+                X0=X_bn[:, self.nonlinear_indices_],
+                bins=self.n_calibration_bins
+            )
 
     def _fit_classifier(self, X1, bins=None, X0=None):
         """ The neural network below captures the residual non-linearity after the transformations above.
