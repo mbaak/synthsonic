@@ -21,4 +21,20 @@ Project Organization
 * Ablation studies can be rerun with the command: `notebooks/leaderboard/ablation/`
 
 
+Quick run
+---------
 
+As a quick example, you can do:
+
+.. code-block:: python
+
+  from synthsonic.models.kde_copula_nn_pdf import KDECopulaNNPdf
+  import pandas as pd
+
+  # open fake car insurance data
+  df = pd.read_csv('notebooks/plots/fake_insurance_data.csv.gz')
+  df.head()
+
+  # model the data
+  model= KDECopulaNNPdf()
+  model = model.fit(df.values)
