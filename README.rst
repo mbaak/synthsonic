@@ -17,8 +17,7 @@ Project Organization
 * The `Synthsonic` model is found at: `synthsonic/models/kde_copula_nn_pdf.py`
 * As an example how to run it with the SDGym package, have a look at the notebook: `notebooks/leaderboard/adult_all_variables.ipynb`
 * Figures of the neurips paper can be reproduced by running the notebooks in: `notebooks/plots/`
-* Leaderboard scores can be rerun with the command: `notebooks/leaderboard/leaderboard_compare_variations.py`
-* Ablation studies can be rerun with the command: `notebooks/leaderboard/ablation/`
+* Experiments (including leaderboard, ablation studies) can be rerun with the instructions found in: `notebooks/experiments/`
 
 
 Quick run
