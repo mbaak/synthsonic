@@ -30,6 +30,7 @@ setup(
     version='0.1.0',
     description='Super realistic data modelling and synthesis',
     author='anon_for_review',
+    python_requires='>=3.6,<3.9',
     license='MIT',
     install_requires=REQUIREMENTS,
     extras_require=EXTRA_REQUIREMENTS,

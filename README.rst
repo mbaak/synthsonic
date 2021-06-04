@@ -10,6 +10,10 @@ Users can install with `pip install .`
 
 Developers should install with `pip install -e '.[dev,test]'`
 
+Requirements
+************
+
+Python 3.6 -- 3.8 are supported
 
 Project Organization
 --------------------
