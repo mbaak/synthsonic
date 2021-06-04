@@ -5,7 +5,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from pgmpy.estimators import BayesianEstimator
 from sdgym.data import load_dataset
 from sdgym.results import make_leaderboard
 from sdgym.synthesizers.base import BaseSynthesizer
@@ -157,40 +156,16 @@ def get_settings():
         # Bayesian Network Sim.
         # ============================================
         "asia": {
-            "pdf_args": {
-                "bm_fit_args": dict(
-                    estimator=BayesianEstimator,
-                    prior_type="dirichlet",
-                    pseudo_counts=0.1,
-                ),
-            }
+            "pdf_args": {}
         },
         "child": {
-            "pdf_args": {
-                "bm_fit_args": dict(
-                    estimator=BayesianEstimator,
-                    prior_type="dirichlet",
-                    pseudo_counts=0.1,
-                ),
-            }
+            "pdf_args": {}
         },
         "insurance": {
-            "pdf_args": {
-                "bm_fit_args": dict(
-                    estimator=BayesianEstimator,
-                    prior_type="dirichlet",
-                    pseudo_counts=0.1,
-                ),
-            }
+            "pdf_args": {}
         },
         "alarm": {
-            "pdf_args": {
-                "bm_fit_args": dict(
-                    estimator=BayesianEstimator,
-                    prior_type="dirichlet",
-                    pseudo_counts=0.1,
-                ),
-            }
+            "pdf_args": {}
         },
         # ============================================
         # Real
