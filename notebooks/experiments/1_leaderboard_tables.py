@@ -16,9 +16,7 @@ def table4(leaderboard, scores):
         \cmidrule(r){2-3} \cmidrule(r){4-5}\cmidrule(r){6-7}
         Method      & $\mathcal{L}_{syn}$     & $\mathcal{L}_{test}$    & $\mathcal{L}_{syn}$     & $\mathcal{L}_{test}$  & $\mathcal{L}_{syn}$     & $\mathcal{L}_{test}$    \\
         \midrule
-        Identity
-                                            & $-3.47$           & $-3.49$           & $-3.59$       & $-3.64$   & $-1.71$           & $-1.70$  \\
-        \midrule
+
     """
 
     table_rows = ""
