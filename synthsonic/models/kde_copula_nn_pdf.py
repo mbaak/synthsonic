@@ -322,7 +322,7 @@ class KDECopulaNNPdf(BaseEstimator):
         df = pd.DataFrame(X_discrete)
         # "tan" bayesian network needs string column names
         df.columns = [str(c) for c in df.columns]
-        est = TreeSearch(df, root_node=df.columns[0])
+        est = TreeSearch(df, root_node=None)
         dag = est.estimate(
             estimator_type=self.estimator_type,
             class_node=str(self.class_node) if self.class_node is not None else None,
