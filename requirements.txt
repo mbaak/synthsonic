@@ -8,4 +8,4 @@ scipy<1.6.0>=1.1.0
 phik>=0.11.1
 cython>=0.29.22
 pgmpy @ git+https://github.com/pgmpy/pgmpy.git@dev
-SDGym @ git+https://github.com/sbrugman/SDGym.git@v0.2.2.4
+SDGym @ git+https://github.com/sbrugman/SDGym.git@v0.2.2.fork
