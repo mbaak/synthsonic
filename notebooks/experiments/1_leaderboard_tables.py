@@ -136,54 +136,36 @@ def table6(leaderboard, scores):
     table_rows = ""
     name = "Identity"
     idx = "IdentitySynthesizer"
-    s1 = leaderboard.at[idx, "adult/f1"]
     t1 = leaderboard.at[idx, "adult/f1"]
-    s2 = leaderboard.at[idx, "census/f1"]
     t2 = leaderboard.at[idx, "census/f1"]
-    s3 = leaderboard.at[idx, "credit/f1"]
     t3 = leaderboard.at[idx, "credit/f1"]
-    s4 = leaderboard.at[idx, "covtype/macro_f1"]
     t4 = leaderboard.at[idx, "covtype/macro_f1"]
-    s5 = leaderboard.at[idx, "intrusion/macro_f1"]
     t5 = leaderboard.at[idx, "intrusion/macro_f1"]
-    s6 = leaderboard.at[idx, "news/r2"]
     t6 = leaderboard.at[idx, "news/r2"]
-    table_rows += f"\\texttt{{{name}}} & ${s1:.02f}$ & ${t1:.02f}$ & ${s2:.02f}$ & ${t2:.02f}$ & ${s3:.02f}$ & ${t3:.02f}$ & ${s4:.02f}$ & ${t4:.02f}$ & ${s5:.02f}$ & ${t5:.02f}$ & ${s6:.02f}$ & ${t6:.02f}$\\\\ \n"
+    table_rows += f"\\texttt{{{name}}} & ${t1:.02f}$ & ${t2:.02f}$ & ${t3:.02f}$ & ${t4:.02f}$ & ${t5:.02f}$ & ${t6:.02f}$\\\\ \n"
     table_rows += "\\midrule\n"
 
     for name in ["CLBN", "PrivBN", "TVAE", "CTGAN"]:
         idx = name
         if name != "CTGAN":
             idx += "Synthesizer"
-        s1 = leaderboard.at[idx, "adult/f1"]
         t1 = leaderboard.at[idx, "adult/f1"]
-        s2 = leaderboard.at[idx, "census/f1"]
         t2 = leaderboard.at[idx, "census/f1"]
-        s3 = leaderboard.at[idx, "credit/f1"]
         t3 = leaderboard.at[idx, "credit/f1"]
-        s4 = leaderboard.at[idx, "covtype/macro_f1"]
         t4 = leaderboard.at[idx, "covtype/macro_f1"]
-        s5 = leaderboard.at[idx, "intrusion/macro_f1"]
         t5 = leaderboard.at[idx, "intrusion/macro_f1"]
-        s6 = leaderboard.at[idx, "news/r2"]
         t6 = leaderboard.at[idx, "news/r2"]
-        table_rows += f"\\texttt{{{name}}} & ${s1:.02f}$ & ${t1:.02f}$ & ${s2:.02f}$ & ${t2:.02f}$ & ${s3:.02f}$ & ${t3:.02f}$ & ${s4:.02f}$ & ${t4:.02f}$ & ${s5:.02f}$ & ${t5:.02f}$ & ${s6:.02f}$ & ${t6:.02f}$\\\\ \n"
+        table_rows += f"\\texttt{{{name}}} & ${t1:.02f}$ & ${t2:.02f}$ & ${t3:.02f}$ & ${t4:.02f}$ & ${t5:.02f}$ & ${t6:.02f}$\\\\ \n"
     table_rows += "\\bottomrule\n"
     name = "Synthsonic"
     idx = "Synthsonic[all]"
-    s1 = scores.at[idx, "adult/f1"]
     t1 = scores.at[idx, "adult/f1"]
-    s2 = scores.at[idx, "census/f1"]
     t2 = scores.at[idx, "census/f1"]
-    s3 = scores.at[idx, "credit/f1"]
     t3 = scores.at[idx, "credit/f1"]
-    s4 = scores.at[idx, "covtype/macro_f1"]
     t4 = scores.at[idx, "covtype/macro_f1"]
-    s5 = scores.at[idx, "intrusion/macro_f1"]
     t5 = scores.at[idx, "intrusion/macro_f1"]
-    s6 = scores.at[idx, "news/r2"]
     t6 = scores.at[idx, "news/r2"]
-    table_rows += f"\\texttt{{{name}}} & ${s1:.02f}$ & ${t1:.02f}$ & ${s2:.02f}$ & ${t2:.02f}$ & ${s3:.02f}$ & ${t3:.02f}$ & ${s4:.02f}$ & ${t4:.02f}$ & ${s5:.02f}$ & ${t5:.02f}$ & ${s6:.02f}$ & ${t6:.02f}$\\\\ \n"
+    table_rows += f"\\texttt{{{name}}} & ${t1:.02f}$ & ${t2:.02f}$ & ${t3:.02f}$ & ${t4:.02f}$ & ${t5:.02f}$ & ${t6:.02f}$\\\\ \n"
 
     table_foot = r"""\end{tabular}
     \end{table}"""
