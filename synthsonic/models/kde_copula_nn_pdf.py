@@ -85,7 +85,7 @@ class KDECopulaNNPdf(BaseEstimator):
         clffitkw={},
         estimator_type="tan",
         edge_weights_fn="mutual_info",
-        class_node=1,
+        class_node=None,
         bm_fit_args={},  # ex: estimator=BayesianEstimator, prior_type='dirichlet', pseudo_counts=0.1
         apply_calibration=True,
         isotonic_increasing="auto",  # or True
