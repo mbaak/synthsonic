@@ -705,7 +705,7 @@ class KDECopulaNNPdf(BaseEstimator):
 
         # use mutual information to capture residual levels of non-linearity
         mi = np.zeros((n_features, n_features))
-        for i in tqdm(range(n_features), description='mutual info regression', total=n_features):
+        for i in tqdm(range(n_features), desc='mutual info regression', total=n_features):
             mi[i, :] = mutual_info_regression(X_discrete, X_discrete[:, i], random_state=self.random_state + i)
 
         # select all off-diagonal mutual information values and index pairs
