@@ -6,9 +6,9 @@ Synthsonic: fast, probabilistic data modelling and synthesis
 Installation
 ------------
 
-Users can install with `pip install .`
+Users can install with :code:`pip install .`
 
-Developers should install with `pip install -e '.[dev,test]'`
+Developers should install with :code:`pip install -e '.[dev,test]'`
 
 Requirements
 ************
