@@ -17,13 +17,6 @@ EXTRA_REQUIREMENTS = {
 
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 
-REQUIREMENTS.append(
-    'pgmpy @ file://localhost{}/third_party/pgmpy_dev'.format(PKG_DIR)
-)
-REQUIREMENTS.append(
-    'sdgym @ file://localhost{}/third_party/sdgym-0.2.2.fork'.format(PKG_DIR)
-)
-
 setup(
     name='synthsonic',
     packages=find_packages(),
