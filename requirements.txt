@@ -1,5 +1,7 @@
 click
 awscli
+seaborn
+xgboost
 numpy>=1.18.0
 python-dotenv>=0.5.1
 pandas<=1.2.2 # higher versions cause problems with benchmarking
@@ -7,4 +9,5 @@ matplotlib>=3.2.1
 scipy<1.6.0>=1.1.0
 phik>=0.11.1
 cython>=0.29.22
-pgmpy @ git+https://github.com/sbrugman/pgmpy.git@sampling_speedups
+sdgym==0.2.2
+pgmpy

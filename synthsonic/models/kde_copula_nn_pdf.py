@@ -85,7 +85,8 @@ class KDECopulaNNPdf(BaseEstimator):
         clffitkw={},
         estimator_type="tan",
         edge_weights_fn="mutual_info",
-        class_node=1,
+        class_node=None,
+        root_node=None,
         bm_fit_args={},  # ex: estimator=BayesianEstimator, prior_type='dirichlet', pseudo_counts=0.1
         apply_calibration=True,
         isotonic_increasing="auto",  # or True
@@ -176,6 +177,7 @@ class KDECopulaNNPdf(BaseEstimator):
         self.estimator_type = estimator_type
         self.edge_weights_fn = edge_weights_fn
         self.class_node = class_node
+        self.root_node = root_node
         self.bm_fit_args = bm_fit_args
 
         # Logging
@@ -322,7 +324,7 @@ class KDECopulaNNPdf(BaseEstimator):
         df = pd.DataFrame(X_discrete)
         # "tan" bayesian network needs string column names
         df.columns = [str(c) for c in df.columns]
-        est = TreeSearch(df, root_node=df.columns[0])
+        est = TreeSearch(df, root_node=df.columns[self.root_node] if self.root_node is not None else None)
         dag = est.estimate(
             estimator_type=self.estimator_type,
             class_node=str(self.class_node) if self.class_node is not None else None,
