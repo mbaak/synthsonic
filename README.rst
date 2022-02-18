@@ -5,6 +5,8 @@ Synthsonic: fast, probabilistic data modelling and synthesis of tabular data.
 
 See our AIstats 2022 contribution for details!
 
+* Version: 0.1.0. Released: Feb 2022
+
 Installation
 ------------
 
