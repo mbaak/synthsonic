@@ -1,34 +1,40 @@
-import numpy as np
-from synthsonic.models.kde_utils import kde_process_data, kde_bw, kde_make_transformers, kde_smooth_peaks_1dim
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.utils import check_array
-from sklearn.utils.validation import FLOAT_DTYPES # check_is_fitted, _deprecate_positional_args
-from sklearn.preprocessing import QuantileTransformer
-from scipy.stats import norm
-from scipy.special import erf
-from scipy import interpolate
+from __future__ import annotations
+
 import warnings
+
+import numpy as np
+from scipy import interpolate
+from scipy.special import erf
+from scipy.stats import norm
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing import QuantileTransformer
+from sklearn.utils import check_array
+from sklearn.utils.validation import FLOAT_DTYPES  # check_is_fitted, _deprecate_positional_args
+
+from synthsonic.models.kde_utils import kde_bw, kde_make_transformers, kde_process_data, kde_smooth_peaks_1dim
 
 
 class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
-    """ Quantile tranformer class using for each variable the CDF obtained with kernel density estimation
-    """
-    def __init__(self,
-                 n_quantiles=1000,
-                 output_distribution='uniform',
-                 smooth_peaks=True,
-                 mirror_left=None,
-                 mirror_right=None,
-                 rho=0.5,
-                 n_adaptive=1,
-                 x_min=None,
-                 x_max=None,
-                 n_integral_bins=1000,
-                 use_KDE=True,
-                 use_inverse_qt=False,
-                 random_state=0,
-                 copy=True):
-        """ Parameters with the class KDEQuantileTransformer
+    """Quantile tranformer class using for each variable the CDF obtained with kernel density estimation"""
+
+    def __init__(
+        self,
+        n_quantiles=1000,
+        output_distribution="uniform",
+        smooth_peaks=True,
+        mirror_left=None,
+        mirror_right=None,
+        rho=0.5,
+        n_adaptive=1,
+        x_min=None,
+        x_max=None,
+        n_integral_bins=1000,
+        use_KDE=True,
+        use_inverse_qt=False,
+        random_state=0,
+        copy=True,
+    ):
+        """Parameters with the class KDEQuantileTransformer
 
         KDEQuantileTransformer is a quantile tranformer class using for each variable the CDF obtained with
         kernel density estimation. Besides normal transformation functions, the class also provides the jacobian
@@ -99,13 +105,17 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
 
         # basic checks on attributes
         if self.n_quantiles <= 0:
-            raise ValueError("Invalid value for 'n_quantiles': %d. The number of quantiles must be at least one."
-                             % self.n_quantiles)
-        if self.output_distribution not in ('normal', 'uniform'):
-            raise ValueError("'output_distribution' has to be either 'normal' or 'uniform'. Got '{}' instead."
-                             % self.output_distribution)
-        if (isinstance(self.rho, np.ndarray) and any([r <= 0 for r in self.rho])) or \
-                (isinstance(self.rho, (float, np.number)) and self.rho <= 0):
+            raise ValueError(
+                "Invalid value for 'n_quantiles': %d. The number of quantiles must be at least one." % self.n_quantiles
+            )
+        if self.output_distribution not in ("normal", "uniform"):
+            raise ValueError(
+                "'output_distribution' has to be either 'normal' or 'uniform'. Got '{}' instead."
+                % self.output_distribution
+            )
+        if (isinstance(self.rho, np.ndarray) and any([r <= 0 for r in self.rho])) or (
+            isinstance(self.rho, (float, np.number)) and self.rho <= 0
+        ):
             raise ValueError("Invalid value(s) for 'rho': %f. The number(s) must be greater than zero." % self.rho)
         if self.n_adaptive < 0:
             raise ValueError("Invalid value for 'n_adaptive': %d. Must be positive." % self.n_adaptive)
@@ -126,41 +136,51 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         # continuation of basic checks, now that we know X
         if isinstance(self.rho, np.ndarray):
             if self.rho.shape[0] != n_features:
-                raise ValueError("Invalid size of 'rho': %d. The number should match the data: %d."
-                                 % (self.rho.shape[0], n_features))
+                raise ValueError(
+                    "Invalid size of 'rho': %d. The number should match the data: %d." % (self.rho.shape[0], n_features)
+                )
         else:
             self.rho = np.array([self.rho] * n_features)
         if isinstance(self.mirror_left, np.ndarray):
             if self.mirror_left.shape[0] != n_features:
-                raise ValueError("Invalid size of 'mirror_left': %d. The number should match the data: %d."
-                                 % (self.mirror_left.shape[0], n_features))
+                raise ValueError(
+                    "Invalid size of 'mirror_left': %d. The number should match the data: %d."
+                    % (self.mirror_left.shape[0], n_features)
+                )
         else:
             self.mirror_left = np.array([None] * n_features)
         if isinstance(self.mirror_right, np.ndarray):
             if self.mirror_right.shape[0] != n_features:
-                raise ValueError("Invalid size of 'mirror_right': %d. The number should match the data: %d."
-                                 % (self.mirror_right.shape[0], n_features))
+                raise ValueError(
+                    "Invalid size of 'mirror_right': %d. The number should match the data: %d."
+                    % (self.mirror_right.shape[0], n_features)
+                )
         else:
             self.mirror_right = np.array([None] * n_features)
         if isinstance(self.x_min, np.ndarray):
             if self.x_min.shape[0] != n_features:
-                raise ValueError("Invalid size of 'x_min': %d. The number should match the data: %d."
-                                 % (self.x_min.shape[0], n_features))
+                raise ValueError(
+                    "Invalid size of 'x_min': %d. The number should match the data: %d."
+                    % (self.x_min.shape[0], n_features)
+                )
         else:
             self.x_min = np.array([None] * n_features)
         if isinstance(self.x_max, np.ndarray):
             if self.x_max.shape[0] != n_features:
-                raise ValueError("Invalid size of 'x_max': %d. The number should match the data: %d."
-                                 % (self.x_max.shape[0], n_features))
+                raise ValueError(
+                    "Invalid size of 'x_max': %d. The number should match the data: %d."
+                    % (self.x_max.shape[0], n_features)
+                )
         else:
             self.x_max = np.array([None] * n_features)
 
         # number of quantiles cannot be higher than number of data points. If so, reset.
         if self.n_quantiles > n_samples:
-            warnings.warn("n_quantiles (%s) is greater than the total number "
-                          "of samples (%s). n_quantiles is set to "
-                          "n_samples."
-                          % (self.n_quantiles, n_samples))
+            warnings.warn(
+                "n_quantiles (%s) is greater than the total number "
+                "of samples (%s). n_quantiles is set to "
+                "n_samples." % (self.n_quantiles, n_samples)
+            )
         self.n_quantiles = max(1, min(self.n_quantiles, n_samples))
 
         # set the (x_min, x_max) transformation range
@@ -192,7 +212,7 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         # standard quantile transformer helps to smooth out any residual imperfections after kde transformation,
         # and does conversion to normal.
         self.qt_ = QuantileTransformer(
-            n_quantiles=self.n_quantiles, 
+            n_quantiles=self.n_quantiles,
             output_distribution=self.output_distribution,
             copy=self.copy,
             random_state=self.random_state,
@@ -211,21 +231,22 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         """
         self.pdf_ = []
 
-        n_samples, n_features = X.shape
+        _, n_features = X.shape
         ps = np.linspace(0, 1, self.n_quantiles + 1)
 
         # calculate quantiles and pdf
         for i in range(n_features):
             x = X[:, i]
             bin_edges = np.quantile(x, ps)
-            bin_entries = [1./self.n_quantiles] * self.n_quantiles
+            bin_entries = [1.0 / self.n_quantiles] * self.n_quantiles
             bin_diffs = np.diff(bin_edges)
             pdf_norm = np.divide(bin_entries, bin_diffs, out=np.zeros_like(bin_entries), where=bin_diffs != 0)
             # ensure interpolate works up to last bin edge, somehow ignored otherwise
             pdf_norm = np.concatenate([pdf_norm, [pdf_norm[-1]]])
-            fast_pdf = interpolate.interp1d(bin_edges, pdf_norm, kind='previous', bounds_error=False,
-                                            fill_value=(min_pdf_value, min_pdf_value))
-            self.pdf_.append({'fast': fast_pdf, 'bin_edges': bin_edges, 'bin_entries': bin_entries})
+            fast_pdf = interpolate.interp1d(
+                bin_edges, pdf_norm, kind="previous", bounds_error=False, fill_value=(min_pdf_value, min_pdf_value)
+            )
+            self.pdf_.append({"fast": fast_pdf, "bin_edges": bin_edges, "bin_entries": bin_entries})
 
     def _kde_fit(self, X):
         """Internal function to compute the kde-based quantiles used for transforming.
@@ -242,18 +263,28 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
 
         for i in range(n_features):
             # do kde fit, store each pdf
-            bin_entries, bin_mean = kde_process_data(X[:, i], self.n_quantiles, self.smooth_peaks,
-                                                     self.mirror_left[i], self.mirror_right[i],
-                                                     random_state=self.random_state)
+            bin_entries, bin_mean = kde_process_data(
+                X[:, i],
+                self.n_quantiles,
+                self.smooth_peaks,
+                self.mirror_left[i],
+                self.mirror_right[i],
+                random_state=self.random_state,
+            )
             band_width = kde_bw(bin_mean, bin_entries, self.rho[i], self.n_adaptive)
             # transformers to uniform distribution and back
-            fast_pdf, F, Finv, kde_norm = kde_make_transformers(bin_mean, bin_entries, band_width,
-                                                                x_min=self.x_min[i], x_max=self.x_max[i],
-                                                                n_bins=self.n_integral_bins)
+            fast_pdf, F, Finv, kde_norm = kde_make_transformers(
+                bin_mean, bin_entries, band_width, x_min=self.x_min[i], x_max=self.x_max[i], n_bins=self.n_integral_bins
+            )
             # store cdf, inverse-cdf, and pdf.
             self.cdf_.append((F, Finv))
-            pdf = {'bin_entries': bin_entries, 'bin_mean': bin_mean, 'band_width': band_width,
-                   'norm': kde_norm, 'fast': fast_pdf}
+            pdf = {
+                "bin_entries": bin_entries,
+                "bin_mean": bin_mean,
+                "band_width": band_width,
+                "norm": kde_norm,
+                "fast": fast_pdf,
+            }
             self.pdf_.append(pdf)
 
         return self
@@ -273,8 +304,14 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
             x = X[:, feature_idx]
             # smooth peaks - note: this adds a random component to the data
             # applying smoothing to data that's already been smoothed has no impact, b/c all peaks are already gone.
-            x = kde_smooth_peaks_1dim(x, self.mirror_left[feature_idx], self.mirror_right[feature_idx],
-                                      copy=False, random_state=self.random_state, smoothing_width=1e-5)
+            x = kde_smooth_peaks_1dim(
+                x,
+                self.mirror_left[feature_idx],
+                self.mirror_right[feature_idx],
+                copy=False,
+                random_state=self.random_state,
+                smoothing_width=1e-5,
+            )
             X[:, feature_idx] = x
         return X
 
@@ -294,8 +331,13 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
             # smooth peaks - note: this adds a random component to the data
             # applying smoothing to data that's already been smoothed has no impact, b/c all peaks are already gone.
             if self.smooth_peaks:
-                x = kde_smooth_peaks_1dim(x, self.mirror_left[feature_idx], self.mirror_right[feature_idx],
-                                          copy=False, random_state=self.random_state)
+                x = kde_smooth_peaks_1dim(
+                    x,
+                    self.mirror_left[feature_idx],
+                    self.mirror_right[feature_idx],
+                    copy=False,
+                    random_state=self.random_state,
+                )
             # transform distribution to uniform
             y = self.cdf_[feature_idx][0](x)
             # transform uniform [0,1] distribution to normal
@@ -334,7 +376,7 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
             x = X[:, feature_idx]
             # transform normal back to uniform [0,1]
             if not self.use_inverse_qt:
-                x = (0.5 + 0.5 * erf(x/np.sqrt(2.))) if self.output_distribution == 'normal' else x
+                x = (0.5 + 0.5 * erf(x / np.sqrt(2.0))) if self.output_distribution == "normal" else x
             # transform uniform back to original distribution
             X[:, feature_idx] = self.cdf_[feature_idx][1](x)
 
@@ -371,10 +413,10 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
         jac = 1.0
 
         for idx in range(X.shape[1]):
-            kdfi = self.pdf_[idx]['fast']
+            kdfi = self.pdf_[idx]["fast"]
             jac /= kdfi(X[:, idx])
 
-        if self.output_distribution == 'normal':
+        if self.output_distribution == "normal":
             X = self.transform(X)
             for idx in range(X.shape[1]):
                 jac *= norm.pdf(X[:, idx])
@@ -393,14 +435,14 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
 
         inv_jac = 1.0
 
-        if self.output_distribution == 'normal':
+        if self.output_distribution == "normal":
             for idx in range(X.shape[1]):
                 inv_jac /= norm.pdf(X[:, idx])
 
         X = self.inverse_transform(X)
 
         for idx in range(X.shape[1]):
-            kdfi = self.pdf_[idx]['fast']
+            kdfi = self.pdf_[idx]["fast"]
             inv_jac *= kdfi(X[:, idx])
 
         return inv_jac

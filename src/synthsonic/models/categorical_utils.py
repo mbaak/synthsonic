@@ -1,5 +1,7 @@
-import pandas as pd
+from __future__ import annotations
+
 import numpy as np
+import pandas as pd
 from sklearn.preprocessing import OrdinalEncoder
 
 
@@ -13,7 +15,7 @@ def vec_translate(a, my_dict):
 
 
 def categorical_frequency_mapping(data, columns):
-    """Sort the """
+    """Sort the"""
     inv_mappings = {}
     for col in columns:
         unique_values, counts = np.unique(data[:, col], return_counts=True)
@@ -49,7 +51,7 @@ def decode_one_hot(samples, columns, unique_values, n_features):
     for col in columns:
         start_idx = end_idx
         end_idx = start_idx + len(unique_values[col])
-        indices = samples[:, start_idx : end_idx].argmax(axis=1).astype(int)
+        indices = samples[:, start_idx:end_idx].argmax(axis=1).astype(int)
         assert np.max(indices) <= end_idx - start_idx
         recreated[:, col] = unique_values[col][indices]
     return recreated

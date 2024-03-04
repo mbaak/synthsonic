@@ -1,8 +1,8 @@
+from __future__ import annotations
+
 import numpy as np
-
-from scipy.stats import norm
 from scipy import interpolate
-
+from scipy.stats import norm
 
 """ Utility functions for Kernel density estimation of 1-dimensional data distributions
 
@@ -34,11 +34,10 @@ def weighted_mean(a, weights=None, axis=None, dtype=None, keepdims=False):
     """
     if weights is None:
         return np.mean(a, axis=axis, dtype=dtype, keepdims=keepdims)
-    else:
-        w = np.array(weights)
-        nom = np.sum(w * np.array(a), axis=axis, dtype=dtype, keepdims=keepdims)
-        denom = np.sum(w, axis=axis, dtype=dtype, keepdims=keepdims)
-        return nom / denom
+    w = np.array(weights)
+    nom = np.sum(w * np.array(a), axis=axis, dtype=dtype, keepdims=keepdims)
+    denom = np.sum(w, axis=axis, dtype=dtype, keepdims=keepdims)
+    return nom / denom
 
 
 def weighted_std(a, weights=None, axis=None, dtype=None, ddof=0, keepdims=False):
@@ -60,11 +59,12 @@ def weighted_std(a, weights=None, axis=None, dtype=None, ddof=0, keepdims=False)
     """
     if weights is None:
         return np.std(a, axis=axis, dtype=dtype, ddof=ddof, keepdims=keepdims)
-    else:
-        w = np.array(weights)
-        m = weighted_mean(a, weights=w, axis=axis, keepdims=True)
-        return np.sqrt(np.sum(w * (np.array(a) - m) ** 2, axis=axis, dtype=dtype, keepdims=keepdims) /  # noqa: W504
-                       (np.sum(w, axis=axis, dtype=dtype, keepdims=keepdims) - ddof))
+    w = np.array(weights)
+    m = weighted_mean(a, weights=w, axis=axis, keepdims=True)
+    return np.sqrt(
+        np.sum(w * (np.array(a) - m) ** 2, axis=axis, dtype=dtype, keepdims=keepdims)
+        / (np.sum(w, axis=axis, dtype=dtype, keepdims=keepdims) - ddof)
+    )
 
 
 def kde_smooth_peaks(X, mirror_left=None, mirror_right=None, copy=False, smoothing_width=1e-7, random_state=None):
@@ -86,7 +86,8 @@ def kde_smooth_peaks(X, mirror_left=None, mirror_right=None, copy=False, smoothi
         List of data points where non-unique peaks have been smoothed.
     """
     if len(X.shape) != 2:
-        raise ValueError("Input 'X' should have 2 dimensions. Use reshape(-1, 1) if one dimension.")
+        msg = "Input 'X' should have 2 dimensions. Use reshape(-1, 1) if one dimension."
+        raise ValueError(msg)
 
     # modifications to the data happen below
     data = X.copy() if copy else X
@@ -99,15 +100,24 @@ def kde_smooth_peaks(X, mirror_left=None, mirror_right=None, copy=False, smoothi
     mirror_right = np.array(mirror_right) if isinstance(mirror_right, mtypes) else np.array([None] * n_features)
 
     if len(mirror_left) != n_features:
-        raise ValueError("Invalid size of 'mirror_left': %d. The number should match the data: %d."
-                         % (len(mirror_left), n_features))
+        raise ValueError(
+            "Invalid size of 'mirror_left': %d. The number should match the data: %d." % (len(mirror_left), n_features)
+        )
     if len(mirror_right) != n_features:
-        raise ValueError("Invalid size of 'mirror_right': %d. The number should match the data: %d."
-                         % (len(mirror_right), n_features))
+        raise ValueError(
+            "Invalid size of 'mirror_right': %d. The number should match the data: %d."
+            % (len(mirror_right), n_features)
+        )
 
     for i in range(n_features):
-        data[:, i] = kde_smooth_peaks_1dim(data[:, i], mirror_left[i], mirror_right[i], copy=False,
-                                           smoothing_width=smoothing_width, random_state=random_state)
+        data[:, i] = kde_smooth_peaks_1dim(
+            data[:, i],
+            mirror_left[i],
+            mirror_right[i],
+            copy=False,
+            smoothing_width=smoothing_width,
+            random_state=random_state,
+        )
     return data
 
 
@@ -131,7 +141,8 @@ def kde_smooth_peaks_1dim(X, mirror_left=None, mirror_right=None, copy=False, sm
     """
     # basic checks
     if X.ndim != 1:
-        raise ValueError("Input 'X' should have dimension of 1.")
+        msg = "Input 'X' should have dimension of 1."
+        raise ValueError(msg)
 
     mirror_left, mirror_right = _parse_mirror_points(X, mirror_left, mirror_right)
     return _kde_smooth_peaks(X, mirror_left, mirror_right, copy, smoothing_width, random_state)
@@ -183,7 +194,7 @@ def _kde_smooth_peaks(X, mirror_left=None, mirror_right=None, copy=False, smooth
         if mirror_left is not None and np.isclose(v, mirror_left):
             smeer = np.abs(smeer)
         if mirror_right is not None and np.isclose(v, mirror_right):
-            smeer = - np.abs(smeer)
+            smeer = -np.abs(smeer)
         for i, idx in enumerate(idcs):
             data[idx] += smeer[i]
 
@@ -209,14 +220,16 @@ def _parse_mirror_points(X, mirror_left=None, mirror_right=None):
     # properly set left and right mirror points
     mtypes = (np.number, float, int)
     if mirror_left is not None:
-        if (isinstance(mirror_left, bool) and mirror_left) or \
-                (not isinstance(mirror_left, bool) and isinstance(mirror_left, mtypes)):
+        if (isinstance(mirror_left, bool) and mirror_left) or (
+            not isinstance(mirror_left, bool) and isinstance(mirror_left, mtypes)
+        ):
             mirror_left = mirror_left if isinstance(mirror_left, mtypes) else min_orig
         elif isinstance(mirror_left, bool) and not mirror_left:
             mirror_left = None
     if mirror_right is not None:
-        if (isinstance(mirror_right, bool) and mirror_right) or \
-                (not isinstance(mirror_right, bool) and isinstance(mirror_right, mtypes)):
+        if (isinstance(mirror_right, bool) and mirror_right) or (
+            not isinstance(mirror_right, bool) and isinstance(mirror_right, mtypes)
+        ):
             mirror_right = mirror_right if isinstance(mirror_right, mtypes) else max_orig
         elif isinstance(mirror_right, bool) and not mirror_right:
             mirror_right = None
@@ -224,8 +237,9 @@ def _parse_mirror_points(X, mirror_left=None, mirror_right=None):
     return mirror_left, mirror_right
 
 
-def kde_process_data(X, n_quantiles=1000, smooth_peaks=True, mirror_left=None, mirror_right=None,
-                     smoothing_width=1e-7, random_state=None):
+def kde_process_data(
+    X, n_quantiles=1000, smooth_peaks=True, mirror_left=None, mirror_right=None, smoothing_width=1e-7, random_state=None
+):
     """Turn input array into a histogram useful for KDE evaluations
 
     From this histogram the KDE can be easily and quickly calculated.
@@ -247,13 +261,14 @@ def kde_process_data(X, n_quantiles=1000, smooth_peaks=True, mirror_left=None, m
         note: not bin centers in order to improve modelling accuracy.
     """
     if not isinstance(X, np.ndarray) or X.ndim != 1:
-        raise ValueError("Input data 'X' need to be a one-dimensional numpy array.")
+        msg = "Input data 'X' need to be a one-dimensional numpy array."
+        raise ValueError(msg)
 
     # sample profiles
     # note: important to do std after smooth-peaks in order to handle edge cases of unique points properly
     n_total = len(X)
     diff = max(X) - min(X)
-    diff = diff if not np.isclose(diff, 0) else 1.
+    diff = diff if not np.isclose(diff, 0) else 1.0
 
     # number of histogram bins to use below (= number of quantiles to evaluate)
     nbins = max(1, min(n_quantiles, n_total))
@@ -266,15 +281,16 @@ def kde_process_data(X, n_quantiles=1000, smooth_peaks=True, mirror_left=None, m
 
     # find any peaks in the data and smooth them
     if smooth_peaks:
-        data = _kde_smooth_peaks(data, mirror_left, mirror_right, smoothing_width=smoothing_width,
-                                 random_state=random_state)
+        data = _kde_smooth_peaks(
+            data, mirror_left, mirror_right, smoothing_width=smoothing_width, random_state=random_state
+        )
 
     # mirror data around left and/or right-most edge of data is so desired
     # do this to make sure that kde properly models the edges, where signal leakage
     # makes the KDE pdf drop.
     gstd = np.std(data)
     band_width_std = np.power(4 / 3, 0.2) * gstd * np.power(n_total, -0.2)
-    mirror_width = max([10. * band_width_std, 10. * smoothing_width * diff])
+    mirror_width = max([10.0 * band_width_std, 10.0 * smoothing_width * diff])
 
     add_left = []
     add_right = []
@@ -313,7 +329,8 @@ def _kde_histsum(x, bin_x, bin_entries, band_width, n_total):
     :return: float, KDE pdf value for x.
     """
     if not isinstance(x, (float, int, np.number)):
-        raise RuntimeError('x has wrong type')
+        msg = "x has wrong type"
+        raise RuntimeError(msg)
     return np.sum(bin_entries * norm.pdf(x, loc=bin_x, scale=band_width)) / n_total
 
 
@@ -328,10 +345,11 @@ def _kde_pdf(x, bin_x, bin_entries=None, band_width=None):
     """
     # basic input checks and set up
     if not isinstance(x, (float, int, np.number, np.ndarray, list, tuple)):
-        raise RuntimeError('x has wrong type')
-    if bin_entries is not None:
-        if bin_x.shape != bin_entries.shape:
-            raise RuntimeError('bin_entries has wrong type')
+        msg = "x has wrong type"
+        raise RuntimeError(msg)
+    if bin_entries is not None and bin_x.shape != bin_entries.shape:
+        msg = "bin_entries has wrong type"
+        raise RuntimeError(msg)
     if band_width is None:
         # pick up zero-order band-width
         band_width = kde_bw(bin_x, bin_entries, n_adaptive=0)
@@ -400,8 +418,9 @@ def kde_pdf(x, bin_x, bin_entries=None, band_width=None, rho=1, n_adaptive=0, re
     return (p, band_width) if ret_bw else p
 
 
-def kde_make_transformers(bin_mean, bin_entries, band_width=None, x_min=None, x_max=None, rho=1.0, n_bins=1000,
-                          min_pdf_value=1e-20):
+def kde_make_transformers(
+    bin_mean, bin_entries, band_width=None, x_min=None, x_max=None, rho=1.0, n_bins=1000, min_pdf_value=1e-20
+):
     """Create a pdf, cdf and inverse-cdf of a KDE distribution
 
     These are put into interpolation functions for fast evaluation later.
@@ -459,8 +478,9 @@ def kde_make_transformers(bin_mean, bin_entries, band_width=None, x_min=None, x_
     p_mid = kde_pdf(x_mid, bin_x=bin_mean, bin_entries=bin_entries, band_width=bw, rho=rho)
 
     # use simpsons rule for integration
-    integral_sections = np.array(
-        [((x_grid[i + 1] - x_grid[i]) / 6.) * (p_grid[i] + 4. * pm + p_grid[i + 1]) for i, pm in enumerate(p_mid)])
+    integral_sections = np.array([
+        ((x_grid[i + 1] - x_grid[i]) / 6.0) * (p_grid[i] + 4.0 * pm + p_grid[i + 1]) for i, pm in enumerate(p_mid)
+    ])
 
     # at first x-point integral is zero by construction; add artificial point
     # adding epsilon at point 0 to ensure that cumsum never reaches zero and can always be inverted.
@@ -470,7 +490,7 @@ def kde_make_transformers(bin_mean, bin_entries, band_width=None, x_min=None, x_
     # adding epsilon at point -1 to ensure that cumsum never reaches 1 and can always be inverted.
     cumsum = np.cumsum(integral_sections)
     kde_norm = cumsum[-1]
-    cumsum_to = cumsum / (kde_norm * (1. + epsilon))
+    cumsum_to = cumsum / (kde_norm * (1.0 + epsilon))
     cumsum_from = cumsum / kde_norm
 
     F = interpolate.interp1d(x_grid, cumsum_to, bounds_error=False, fill_value=(cumsum[0], cumsum[-1]))
