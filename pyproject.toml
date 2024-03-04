@@ -1,0 +1,87 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "synthsonic"
+version = "0.2.0dev0"
+description = "Super realistic data modelling and synthesis."
+license = "MIT"
+readme = "README.rst"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+authors = [ { name = "INGA WBAA DS", email = "wbaa@ing.com" },]
+
+dependencies = [
+    "numpy",
+    "pandas",
+    "phik>=0.11.1",
+    "pgmpy",
+    "matplotlib",
+    "scipy",
+    "scikit-learn",
+    "tqdm",
+    "xgboost",
+]
+
+[project.optional-dependencies]
+lint = ["pre-commit"]
+test = ["pytest"]
+
+[project.urls]
+Source = "https://github.com/mbaak/synthsonic"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/synthsonic"]
+
+[tool.ruff]
+target-version = "py38"
+line-length = 120
+preview = true
+
+[tool.ruff.lint]
+extend-select = [
+    "E", # pyflakes `E`
+    "W", # pyflakes `W`
+    "I", # isort
+    "TID", # flake8-tidy-imports
+    "UP", # pyupgrade
+    "D212", # pydocstyle
+    "D411", # pydocstyle
+    "ANN001", # flake8-annotations
+    "C4",  # flake8-comprehensions
+    "EM", # flake8-errmsg
+    "FA", # flake8-future-annotations
+    "INP", # flake8-no-pep420
+    "PIE", # flake8-pie
+    "RET", # flake8-return
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "PTH", # flake8-use-pathlib
+    "TD002", # flake8-todos
+    "PL", # pylint
+    "PERF", # perflint
+    "FURB", # refurb
+]
+
+[tool.ruff.lint.per-file-ignores]
+"{tests,docs}/*" = ["ANN001", "INP", "PLR2004"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.coverage.report]
+exclude_also = [
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "@(abc\\.)?abstractmethod",
+    "if TYPE_CHECKING:",
+]
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = false
+
+[tool.ruff.format]
+skip-magic-trailing-comma = true
