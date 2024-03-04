@@ -8,6 +8,7 @@ from typing import Union
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import phik
 from pgmpy.estimators import TreeSearch
 from pgmpy.metrics.bn_inference import BayesianModelProbability
 from pgmpy.models import BayesianModel, BayesianNetwork
@@ -334,9 +335,18 @@ class KDECopulaNNPdf(BaseEstimator):
         # "tan" bayesian network needs string column names
         df.columns = [str(c) for c in df.columns]
         est = TreeSearch(df, root_node=df.columns[self.root_node] if self.root_node is not None else None)
+        if self.estimator_type == "tan" and self.class_node is None:
+            if len(df.columns) == 2:
+                class_node = str(df.columns[0])
+            else:
+                gl_phik_scores, column_names = phik.global_phik_array(df, interval_cols=[])
+                class_node = str(column_names[gl_phik_scores.argmax()])
+        else:
+            class_node = str(self.class_node) if self.class_node is not None else None
+
         dag = est.estimate(
             estimator_type=self.estimator_type,
-            class_node=str(self.class_node) if self.class_node is not None else None,
+            class_node=class_node,
             show_progress=self.verbose,
             edge_weights_fn=self.edge_weights_fn,
         )
