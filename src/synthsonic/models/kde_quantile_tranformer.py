@@ -13,6 +13,8 @@ from sklearn.utils.validation import FLOAT_DTYPES  # check_is_fitted, _deprecate
 
 from synthsonic.models.kde_utils import kde_bw, kde_make_transformers, kde_process_data, kde_smooth_peaks_1dim
 
+_MAX_INT = np.iinfo(np.int64).max
+
 
 class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
     """Quantile tranformer class using for each variable the CDF obtained with kernel density estimation"""
@@ -216,6 +218,7 @@ class KDEQuantileTransformer(TransformerMixin, BaseEstimator):
             output_distribution=self.output_distribution,
             copy=self.copy,
             random_state=self.random_state,
+            subsample=_MAX_INT,
         )
         self.qt_.fit(X)
 
