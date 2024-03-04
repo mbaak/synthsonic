@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from pgmpy.estimators import TreeSearch
-from pgmpy.inference import BayesianModelProbability
+from pgmpy.metrics.bn_inference import BayesianModelProbability
 from pgmpy.models import BayesianModel
 from pgmpy.sampling import BayesianModelSampling
 from scipy import interpolate
