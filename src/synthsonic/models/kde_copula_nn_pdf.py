@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from pgmpy.estimators import TreeSearch
 from pgmpy.metrics.bn_inference import BayesianModelProbability
-from pgmpy.models import BayesianModel
+from pgmpy.models import BayesianModel, BayesianNetwork
 from pgmpy.sampling import BayesianModelSampling
 from scipy import interpolate
 from sklearn.base import BaseEstimator
@@ -350,7 +350,7 @@ class KDECopulaNNPdf(BaseEstimator):
             plt.show()
 
         # model the conditional probabilities
-        self.bn = BayesianModel(dag.edges())
+        self.bn = BayesianNetwork(dag.edges())
         self.bn.fit(df, **self.bm_fit_args)
         # initialize sampler with fitted model
         self.bn_sampler = BayesianModelSampling(self.bn)
