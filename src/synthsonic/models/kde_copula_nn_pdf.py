@@ -11,7 +11,7 @@ import pandas as pd
 import phik
 from pgmpy.estimators import TreeSearch
 from pgmpy.metrics.bn_inference import BayesianModelProbability
-from pgmpy.models import BayesianModel, BayesianNetwork
+from pgmpy.models import BayesianNetwork
 from pgmpy.sampling import BayesianModelSampling
 from scipy import interpolate
 from sklearn.base import BaseEstimator
@@ -603,7 +603,7 @@ class KDECopulaNNPdf(BaseEstimator):
         if discretize:
             bin_width = 1.0 / self.n_uniform_bins
             U = np.floor(U / bin_width)
-            U[U >= self.n_uniform_bins] = self.n_uniform_bins - 1  # correct for values at 1.
+            U[self.n_uniform_bins <= U] = self.n_uniform_bins - 1  # correct for values at 1.
 
         X_trans = self._join_and_reorder(X_cat, U, self.categorical_columns, self.numerical_columns)
         return X_trans[:, self.nonlinear_indices_] if self.n_vars_ >= 2 else X_trans
@@ -635,7 +635,7 @@ class KDECopulaNNPdf(BaseEstimator):
         denominator = 1.0 - nominator
         # calculate ratio. In case denominator is zero, return 1 as ratio.
         ratio = np.divide(nominator, denominator, out=np.ones_like(nominator), where=denominator != 0)
-        return np.array([r if r < self.max_scale_value else self.max_scale_value for r in ratio])
+        return np.array([min(self.max_scale_value, r) for r in ratio])
 
     def _configure_nonlinear_variables(self, X_discrete, X_expect=None):
         """Determine the variables to be modelled non-linearly
