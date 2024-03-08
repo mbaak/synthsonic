@@ -24,6 +24,8 @@ dependencies = [
     "scikit-learn",
     "tqdm",
     "xgboost",
+    "boto3",
+    "appdirs",
 ]
 
 [project.optional-dependencies]
